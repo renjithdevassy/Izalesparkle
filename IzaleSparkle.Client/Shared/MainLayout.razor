@@ -1,0 +1,376 @@
+@inherits LayoutComponentBase
+@inject CartService Cart
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject AuthService Auth
+@implements IDisposable
+
+<div class="page-wrap @(MenuOpen ? "menu-is-open" : "")">
+
+    <!-- ══ TOP NAVBAR ══ -->
+    <nav class="navbar @(IsScrolled ? "scrolled" : "")" role="navigation" aria-label="Main navigation">
+
+        <!-- Hamburger (mobile / tablet) -->
+        <button class="hamburger @(MenuOpen ? "open" : "")"
+                @onclick="ToggleMenu"
+                aria-label="@(MenuOpen ? "Close menu" : "Open menu")"
+                aria-expanded="@MenuOpen.ToString().ToLower()"
+                aria-controls="mobile-menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <!-- Brand -->
+        <a href="/" class="nav-brand" @onclick="CloseMenu">
+            <span class="nav-logo-text">Izale <span class="gold">✦</span> Sparkle</span>
+            <span class="nav-tagline">Where Every Look Sparkles</span>
+        </a>
+
+        <!-- Desktop nav links (hidden on mobile, shown ≥1024px) -->
+        <ul class="nav-links" role="list">
+            <li><a href="/"            class="@NavClass("")"           @onclick="CloseMenu">Home</a></li>
+            <li><a href="/shop"        class="@NavClass("shop")"       @onclick="CloseMenu">Shop</a></li>
+            <li><a href="/collections" class="@NavClass("collections")" @onclick="CloseMenu">Collections</a></li>
+            <li><a href="/about"       class="@NavClass("about")"      @onclick="CloseMenu">About</a></li>
+            <li><a href="/contact"     class="@NavClass("contact")"    @onclick="CloseMenu">Contact</a></li>
+            <li><a href="/admin"         class="@NavClass("admin")"      @onclick="CloseMenu" style="color:var(--gold)">Admin</a></li>
+        </ul>
+
+        <!-- Action icons -->
+        <div class="nav-actions">
+            <button class="nav-icon-btn" title="Search" aria-label="Search" @onclick="OpenSearch">🔍</button>
+            @if (Auth.IsLoggedIn)
+            {
+                <div class="nav-user-menu">
+                    <button class="nav-icon-btn nav-user-btn" @onclick="ToggleUserMenu" title="My Account" aria-label="My Account">
+                        <span class="nav-user-avatar">@(Auth.FirstName?.FirstOrDefault().ToString() ?? "U")</span>
+                    </button>
+                    @if (UserMenuOpen)
+                    {
+                        <div class="nav-user-dropdown">
+                            <div class="nav-user-name">@Auth.FullName</div>
+                            <div class="nav-user-email">@Auth.Email</div>
+                            <div class="nav-user-divider"></div>
+                            @if (Auth.IsAdmin)
+                            {
+                                <a href="/admin" class="nav-user-item" @onclick="CloseUserMenu">⚙️ Admin Panel</a>
+                            }
+                            <a href="/orders" class="nav-user-item" @onclick="CloseUserMenu">📦 My Orders</a>
+                            <button class="nav-user-item nav-user-logout" @onclick="LogoutAsync">🚪 Sign Out</button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <a href="/login" class="nav-icon-btn" title="Sign In" aria-label="Sign In">👤</a>
+            }
+            <button class="nav-icon-btn cart-btn" @onclick="ToggleCart" title="Shopping bag" aria-label="Shopping bag">
+                🛍️
+                @if (Cart.Count > 0)
+                {
+                    <span class="cart-badge" aria-label="@Cart.Count items">@(Cart.Count > 9 ? "9+" : Cart.Count.ToString())</span>
+                }
+            </button>
+        </div>
+    </nav>
+
+    <!-- ══ SEARCH OVERLAY ══ -->
+    @if (SearchOpen)
+    {
+        <div class="search-overlay" @onclick="CloseSearch" aria-modal="true" role="dialog">
+            <div class="search-modal" @onclick:stopPropagation>
+                <div class="search-modal-inner">
+                    <input class="search-modal-input" type="search" inputmode="search"
+                           placeholder="Search for rings, necklaces, earrings…"
+                           @bind="NavSearchQ" @bind:event="oninput"
+                           @onkeydown="OnSearchKey"
+                           autofocus />
+                    <button class="search-modal-btn" @onclick="DoSearch">🔍</button>
+                    <button class="search-modal-close" @onclick="CloseSearch">✕</button>
+                </div>
+                <div class="search-modal-hint">Press Enter to search · Esc to close</div>
+            </div>
+        </div>
+    }
+
+    <!-- ══ MOBILE MENU OVERLAY ══ -->
+    @if (MenuOpen)
+    {
+        <div class="menu-overlay" @onclick="CloseMenu" aria-hidden="true"></div>
+    }
+
+    <!-- ══ MOBILE MENU DRAWER ══ -->
+    <div id="mobile-menu"
+         class="mobile-menu @(MenuOpen ? "open" : "")"
+         role="dialog"
+         aria-label="Navigation menu"
+         aria-modal="true">
+
+        <div class="mobile-menu-head">
+            <span class="mobile-menu-logo">Izale <span class="gold">✦</span> Sparkle</span>
+            <button class="mobile-menu-close" @onclick="CloseMenu" aria-label="Close menu">✕</button>
+        </div>
+
+        <nav class="mobile-menu-nav" aria-label="Mobile navigation">
+            <a href="/"            class="mobile-nav-link @NavClass("")"           @onclick="CloseMenu">
+                <span class="mobile-nav-icon">🏠</span>
+                <span>Home</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+            <a href="/shop"        class="mobile-nav-link @NavClass("shop")"       @onclick="CloseMenu">
+                <span class="mobile-nav-icon">💎</span>
+                <span>Shop</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+            <a href="/collections" class="mobile-nav-link @NavClass("collections")" @onclick="CloseMenu">
+                <span class="mobile-nav-icon">✨</span>
+                <span>Collections</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+            <a href="/about"       class="mobile-nav-link @NavClass("about")"      @onclick="CloseMenu">
+                <span class="mobile-nav-icon">♡</span>
+                <span>About</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+            <a href="/contact"     class="mobile-nav-link @NavClass("contact")"    @onclick="CloseMenu">
+                <span class="mobile-nav-icon">✉</span>
+                <span>Contact</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+            <a href="/admin" class="mobile-nav-link @NavClass("admin")" @onclick="CloseMenu" style="border-top:1px solid var(--gold);color:var(--gold)">
+                <span class="mobile-nav-icon">⚙️</span>
+                <span>Admin Panel</span>
+                <span class="mobile-nav-arrow">›</span>
+                <span class="mobile-nav-icon">✉</span>
+                <span>Contact</span>
+                <span class="mobile-nav-arrow">›</span>
+            </a>
+        </nav>
+
+        <!-- Shop by category quick links -->
+        <div class="mobile-menu-cats">
+            <div class="mobile-cats-title">Shop by Category</div>
+            <div class="mobile-cats-grid">
+                <a href="/shop?cat=rings"     class="mobile-cat-chip" @onclick="CloseMenu">Rings</a>
+                <a href="/shop?cat=necklaces" class="mobile-cat-chip" @onclick="CloseMenu">Necklaces</a>
+                <a href="/shop?cat=earrings"  class="mobile-cat-chip" @onclick="CloseMenu">Earrings</a>
+                <a href="/shop?cat=bracelets" class="mobile-cat-chip" @onclick="CloseMenu">Bracelets</a>
+            </div>
+        </div>
+
+        <div class="mobile-menu-footer">
+            <p class="mobile-menu-tagline">Where Every Look Sparkles ✦</p>
+            <div class="mobile-menu-socials">
+                <a class="mobile-social" href="#" aria-label="Facebook">f</a>
+                <a class="mobile-social" href="#" aria-label="Instagram">◎</a>
+                <a class="mobile-social" href="#" aria-label="X">𝕏</a>
+                <a class="mobile-social" href="#" aria-label="LinkedIn">in</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SW UPDATE BANNER ══ -->
+    <div class="sw-update-banner @(ShowUpdateBanner ? "show" : "")" role="alert">
+        <span>✦ A new version is ready</span>
+        <button class="sw-update-btn" @onclick="ReloadPage">Update Now</button>
+    </div>
+
+    <!-- ══ MAIN CONTENT ══ -->
+    <main class="main-content" id="main-content">@Body</main>
+<CookieBanner />
+
+    <!-- ══ FOOTER ══ -->
+    <footer class="site-footer" role="contentinfo">
+        <div class="footer-inner">
+
+            <!-- Brand column -->
+            <div class="footer-brand-col">
+                <div class="footer-logo">Izale <span class="gold">✦</span> Sparkle</div>
+                <p class="footer-tagline">"Where Every Look Sparkles" — fine jewellery handcrafted with conflict-free gemstones.</p>
+                <div class="footer-socials">
+                    <a class="social-link" href="#" aria-label="Facebook">f</a>
+                    <a class="social-link" href="#" aria-label="Instagram">◎</a>
+                    <a class="social-link" href="#" aria-label="X">𝕏</a>
+                    <a class="social-link" href="#" aria-label="LinkedIn">in</a>
+                </div>
+            </div>
+
+            <!-- Accordion on mobile, static columns on desktop -->
+            @foreach (var col in FooterCols)
+            {
+                <div class="footer-col @(OpenFooterCol == col.Title ? "open" : "")">
+                    <button class="footer-col-header" @onclick="() => ToggleFooterCol(col.Title)" aria-expanded="@(OpenFooterCol == col.Title ? "true" : "false")">
+                        <h4>@col.Title</h4>
+                        <span class="footer-col-toggle" aria-hidden="true">+</span>
+                    </button>
+                    <ul class="footer-col-links" role="list">
+                        @foreach (var lnk in col.Links)
+                        {
+                            <li><a href="@lnk.Href">@lnk.Label</a></li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+
+        <div class="footer-bottom">
+            <span class="footer-copy">© 2024 Izale Sparkle. All Rights Reserved.</span>
+            <span class="footer-copy">
+                <a href="#" style="color:inherit">Privacy</a> ·
+                <a href="#" style="color:inherit">Terms</a> ·
+                <a href="#" style="color:inherit">Cookies</a>
+            </span>
+        </div>
+    </footer>
+
+</div>
+
+<!-- ══ CART OVERLAY ══ -->
+@if (CartOpen)
+{
+    <div class="cart-overlay" @onclick="ToggleCart" aria-hidden="true"></div>
+}
+
+<!-- ══ CART DRAWER ══ -->
+<div class="cart-drawer @(CartOpen ? "open" : "")" role="dialog" aria-label="Shopping bag" aria-modal="true">
+    <div class="cart-drawer-head">
+        <h3>Your Sparkle Bag ✦</h3>
+        <button class="cart-close" @onclick="ToggleCart" aria-label="Close bag">✕</button>
+    </div>
+    <div class="cart-drawer-items">
+        @if (Cart.IsEmpty)
+        {
+            <div class="cart-empty">
+                <div style="font-size:2.5rem;margin-bottom:1rem">✦</div>
+                <p>Your sparkle awaits...</p>
+                <a href="/shop" @onclick="ToggleCart" class="btn btn-dark" style="margin-top:1rem;width:100%">Shop Now ✦</a>
+            </div>
+        }
+        else
+        {
+            @foreach (var item in Cart.Items)
+            {
+                <div class="cart-drawer-item">
+                    <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cart-item-img" loading="lazy" />
+                    <div class="cart-item-info">
+                        <div class="cart-item-name">@item.Product.Name</div>
+                        <div class="cart-item-meta">@item.SelectedMetal · Qty @item.Quantity</div>
+                        <div class="cart-item-price">£@item.LineTotal.ToString("N0")</div>
+                    </div>
+                    <button class="cart-item-remove" @onclick="() => Cart.RemoveItem(item.Product.Id)" aria-label="Remove @item.Product.Name">✕</button>
+                </div>
+            }
+        }
+    </div>
+    @if (!Cart.IsEmpty)
+    {
+        <div class="cart-drawer-foot">
+            <div class="cart-foot-total">
+                <span>Total</span>
+                <span class="cart-total-amt">£@Cart.Subtotal.ToString("N0")</span>
+            </div>
+            <a href="/checkout" @onclick="ToggleCart" class="checkout-link">
+                Checkout — £@Cart.Subtotal.ToString("N0")
+            </a>
+        </div>
+    }
+</div>
+
+<!-- ══ PWA INSTALL BANNER ══ -->
+<div class="pwa-install-banner @(ShowInstallBanner ? "show" : "")" role="complementary" aria-label="Install app">
+    <div class="pwa-banner-icon">💎</div>
+    <div class="pwa-banner-text">
+        <div class="pwa-banner-title">Add to Home Screen</div>
+        <div class="pwa-banner-sub">Shop Izale Sparkle like an app — fast &amp; offline</div>
+    </div>
+    <button class="pwa-banner-btn" @onclick="InstallPwa">Install</button>
+    <button class="pwa-banner-dismiss" @onclick="() => ShowInstallBanner = false" aria-label="Dismiss">✕</button>
+</div>
+
+@code {
+    bool CartOpen          = false;
+    bool UserMenuOpen      = false;
+    bool MenuOpen          = false;
+    bool IsScrolled        = false;
+    bool ShowInstallBanner = false;
+    bool ShowUpdateBanner  = false;
+    string? OpenFooterCol  = null;
+
+    void ToggleCart()     => CartOpen = !CartOpen;
+    void ToggleUserMenu()  => UserMenuOpen = !UserMenuOpen;
+    void CloseUserMenu()   => UserMenuOpen = false;
+    void ToggleMenu()  => MenuOpen = !MenuOpen;
+    void CloseMenu()   => MenuOpen = false;
+    void ReloadPage()  => Nav.NavigateTo(Nav.Uri, forceLoad: true);
+
+    async Task LogoutAsync()
+    {
+        UserMenuOpen = false;
+        await Auth.LogoutAsync(JS);
+        Nav.NavigateTo("/");
+    }
+    void ToggleFooterCol(string title) => OpenFooterCol = OpenFooterCol == title ? null : title;
+
+    string NavClass(string page)
+    {
+        var uri = Nav.Uri.ToLower();
+        if (page == "" && (uri.EndsWith("/") || uri.EndsWith("index"))) return "active";
+        if (page != "" && uri.Contains("/" + page)) return "active";
+        return "";
+    }
+
+    async Task InstallPwa()
+    {
+        await JS.InvokeVoidAsync("triggerPwaInstall");
+        ShowInstallBanner = false;
+    }
+
+    [JSInvokable] public void OnPwaInstallable()    { ShowInstallBanner = true; InvokeAsync(StateHasChanged); }
+    [JSInvokable] public void OnSwUpdateAvailable() { ShowUpdateBanner  = true; InvokeAsync(StateHasChanged); }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await JS.InvokeVoidAsync("initCursor");
+        await JS.InvokeVoidAsync("initScrollReveal");
+        await JS.InvokeVoidAsync("initNavScroll");
+        await JS.InvokeVoidAsync("addPwaInstallListener", DotNetObjectReference.Create(this));
+        await JS.InvokeVoidAsync("addSwUpdateListener",   DotNetObjectReference.Create(this));
+    }
+
+    protected override void OnInitialized() { Cart.OnChange += StateHasChanged; Auth.OnAuthChanged += StateHasChanged; }
+    public    void Dispose()                 { Cart.OnChange -= StateHasChanged; Auth.OnAuthChanged -= StateHasChanged; }
+
+    bool   SearchOpen  = false;
+    string NavSearchQ  = "";
+
+    void OpenSearch()  { SearchOpen = true; }
+    void CloseSearch() { SearchOpen = false; NavSearchQ = ""; }
+
+    void DoSearch()
+    {
+        if (!string.IsNullOrWhiteSpace(NavSearchQ))
+        {
+            Nav.NavigateTo($"/shop?q={Uri.EscapeDataString(NavSearchQ.Trim())}");
+            CloseSearch();
+        }
+    }
+
+    void OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") DoSearch();
+        if (e.Key == "Escape") CloseSearch();
+    }
+
+    record FooterLink  (string Label, string Href);
+    record FooterColumn(string Title, List<FooterLink> Links);
+
+    List<FooterColumn> FooterCols = new()
+    {
+        new("Shop",  new(){ new("Rings","/shop?cat=rings"), new("Necklaces","/shop?cat=necklaces"), new("Earrings","/shop?cat=earrings"), new("Bracelets","/shop?cat=bracelets"), new("All Jewellery","/shop") }),
+        new("Help",  new(){ new("Contact Us","/contact"), new("Sizing Guide","#"), new("Returns","#"), new("Track Order","#"), new("FAQ","#") }),
+        new("About", new(){ new("Our Story","/about"), new("Bespoke","/about#bespoke"), new("Sustainability","/about#ethics"), new("Press","#") }),
+    };
+}

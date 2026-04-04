@@ -1,0 +1,168 @@
+@page "/admin/users"
+@layout AdminLayout
+@inject IApiClient Api
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">
+        Users
+        @if (UserList.Any())
+        {
+            <span class="admin-count-badge">@UserList.Count</span>
+        }
+    </h1>
+</div>
+
+<!-- ── STAT CARDS ── -->
+@if (UserList.Any())
+{
+    <div class="admin-stats-grid" style="margin-bottom:1.5rem">
+        <div class="admin-stat-card">
+            <div class="asc-icon">👥</div>
+            <div class="asc-num">@UserList.Count</div>
+            <div class="asc-label">Total Users</div>
+            <div class="asc-sub">@UserList.Count(u => u.IsActive) active</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">🛍️</div>
+            <div class="asc-num">@UserList.Count(u => u.Role == "Customer")</div>
+            <div class="asc-label">Customers</div>
+            <div class="asc-sub">Registered shoppers</div>
+        </div>
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">⚙️</div>
+            <div class="asc-num">@UserList.Count(u => u.Role == "Admin")</div>
+            <div class="asc-label">Admins</div>
+            <div class="asc-sub">Panel access</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">📅</div>
+            <div class="asc-num">@UserList.Count(u => u.CreatedAt >= DateTime.UtcNow.AddDays(-30))</div>
+            <div class="asc-label">New (30 days)</div>
+            <div class="asc-sub">Recent registrations</div>
+        </div>
+    </div>
+
+    <!-- ── FILTERS ── -->
+    <div class="admin-filters">
+        <input class="admin-search" type="search"
+               placeholder="Search name or email…"
+               @bind="Search" @bind:event="oninput" />
+        <select class="admin-select" @bind="RoleFilter">
+            <option value="">All Roles</option>
+            <option value="Customer">Customers</option>
+            <option value="Admin">Admins</option>
+        </select>
+        <select class="admin-select" @bind="StatusFilter">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+        </select>
+    </div>
+
+    <!-- ── TABLE ── -->
+    <div class="admin-table-wrap" style="margin-top:1rem">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Last Login</th>
+                    <th>Registered</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Filtered)
+                {
+                    <tr>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:.8rem">
+                                <div class="user-avatar-chip @(u.Role == "Admin" ? "admin" : "")">
+                                    @u.FirstName.FirstOrDefault()@u.LastName.FirstOrDefault()
+                                </div>
+                                <div>
+                                    <div class="admin-product-name">@u.FullName</div>
+                                    <div class="admin-product-material">#@u.Id</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="font-size:.78rem">@u.Email</td>
+                        <td>
+                            <span class="admin-badge-chip @(u.Role == "Admin" ? "badge-bestseller" : "")">
+                                @u.Role
+                            </span>
+                        </td>
+                        <td>
+                            <span class="admin-status @(u.IsActive ? "active" : "inactive")">
+                                @(u.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td style="font-size:.72rem;color:var(--warm-gray)">
+                            @if (u.LastLoginAt.HasValue)
+                            {
+                                <span title="@u.LastLoginAt.Value.ToString("dd MMM yyyy HH:mm")">
+                                    @TimeAgo(u.LastLoginAt.Value)
+                                </span>
+                            }
+                            else { <span style="opacity:.4">Never</span> }
+                        </td>
+                        <td style="font-size:.72rem;color:var(--warm-gray)">
+                            @u.CreatedAt.ToString("dd MMM yyyy")
+                        </td>
+                    </tr>
+                }
+                @if (!Filtered.Any())
+                {
+                    <tr><td colspan="6" class="admin-empty">No users match your search.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <div class="admin-empty" style="padding:4rem">No users registered yet.</div>
+}
+
+@code {
+    bool Loading = true;
+    List<UserListResponse> UserList = new();
+    string Search       = "";
+    string RoleFilter   = "";
+    string StatusFilter = "";
+
+    IEnumerable<UserListResponse> Filtered => UserList
+        .Where(u => string.IsNullOrEmpty(Search)
+            || u.FullName.Contains(Search, StringComparison.OrdinalIgnoreCase)
+            || u.Email.Contains(Search, StringComparison.OrdinalIgnoreCase))
+        .Where(u => string.IsNullOrEmpty(RoleFilter)   || u.Role == RoleFilter)
+        .Where(u => StatusFilter switch
+        {
+            "active"   => u.IsActive,
+            "inactive" => !u.IsActive,
+            _          => true
+        });
+
+    protected override async Task OnInitializedAsync()
+    {
+        try   { UserList = (await Api.GetAdminUsersAsync())?.ToList() ?? new(); }
+        catch { }
+        finally { Loading = false; }
+    }
+
+    static string TimeAgo(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt;
+        if (diff.TotalMinutes < 1)   return "Just now";
+        if (diff.TotalHours   < 1)   return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays    < 1)   return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays    < 30)  return $"{(int)diff.TotalDays}d ago";
+        if (diff.TotalDays    < 365) return $"{(int)(diff.TotalDays / 30)}mo ago";
+        return $"{(int)(diff.TotalDays / 365)}y ago";
+    }
+}

@@ -1,0 +1,231 @@
+@page "/orders"
+@inject IApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="page-hero" style="padding:3rem 1rem 2rem;text-align:center">
+    <h1 class="hero-title" style="font-size:2rem">My Orders</h1>
+    <p class="hero-sub">Track your Izale Sparkle orders</p>
+</div>
+
+<div class="shop-container" style="max-width:700px;margin:0 auto;padding:0 1rem 4rem">
+
+    @if (!Searched)
+    {
+        <div class="admin-form-card">
+            <div class="admin-form-section-title">Find Your Orders</div>
+
+            @if (Auth.IsLoggedIn)
+            {
+                <p class="admin-field-hint" style="margin-bottom:1rem">
+                    Showing orders for <strong>@Auth.Email</strong>
+                </p>
+            }
+            else
+            {
+                <div class="admin-field">
+                    <label>Your Email Address</label>
+                    <input @bind="EmailInput" @bind:event="oninput"
+                           @onkeydown="OnKey"
+                           type="email" placeholder="email@example.com" />
+                    <div class="admin-field-hint">Enter the email you used at checkout.</div>
+                </div>
+            }
+
+            <div class="admin-field" style="margin-top:.5rem">
+                <label>Or look up by Order Number <small>optional</small></label>
+                <input @bind="OrderNumberInput" @bind:event="oninput"
+                       @onkeydown="OnKey"
+                       placeholder="IS20241215xxxxxx" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="admin-error-banner" style="margin-top:.5rem">@Error</div>
+            }
+
+            <button class="btn btn-gold" style="width:100%;margin-top:1rem"
+                    @onclick="Search" disabled="@Loading">
+                @(Loading ? "Searching…" : "Find Orders ✦")
+            </button>
+        </div>
+    }
+    else
+    {
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+            <div>
+                <strong>@Orders.Count</strong> order@(Orders.Count == 1 ? "" : "s") found
+                @if (!string.IsNullOrEmpty(SearchedEmail))
+                { <span style="font-size:.78rem;color:var(--warm-gray)"> for @SearchedEmail</span> }
+            </div>
+            <button class="btn btn-outline" style="font-size:.65rem"
+                    @onclick="Reset">← Search Again</button>
+        </div>
+
+        @if (!Orders.Any())
+        {
+            <div class="admin-form-card" style="text-align:center;padding:3rem">
+                <div style="font-size:2rem;margin-bottom:1rem">📦</div>
+                <p style="color:var(--warm-gray)">No orders found. If you placed an order recently, please check your email address matches what you used at checkout.</p>
+            </div>
+        }
+
+        @foreach (var o in Orders)
+        {
+            <div class="order-card">
+                <div class="order-card-header">
+                    <div>
+                        <div class="order-card-number">@o.OrderNumber</div>
+                        <div class="order-card-date">@o.CreatedAt.ToString("dd MMMM yyyy")</div>
+                    </div>
+                    <span class="order-status-chip @o.Status.ToLower()">@o.Status</span>
+                </div>
+
+                <div class="order-card-items">
+                    @foreach (var item in o.Items)
+                    {
+                        <div class="order-card-item">
+                            <div>
+                                <div style="font-weight:500;font-size:.84rem">@item.ProductName</div>
+                                <div style="font-size:.7rem;color:var(--warm-gray)">@item.Metal · Qty @item.Quantity</div>
+                            </div>
+                            <div class="admin-price">£@item.LineTotal.ToString("N2")</div>
+                        </div>
+                    }
+                </div>
+
+                <div class="order-card-footer">
+                    <div style="font-size:.72rem;color:var(--warm-gray)">
+                        @o.Items.Count item@(o.Items.Count == 1 ? "" : "s")
+                        @if (o.Discount > 0) { <span> · Saved £@o.Discount.ToString("N2")</span> }
+                    </div>
+                    <div style="display:flex;align-items:center;gap:.8rem">
+                        @if (o.Status == "Pending" && CancellingOrderNumber != o.OrderNumber)
+                        {
+                            <button class="btn btn-outline"
+                                    style="font-size:.58rem;padding:.4rem .8rem;border-color:#dc2626;color:#dc2626"
+                                    @onclick="() => StartCancel(o.OrderNumber)">
+                                Cancel Order
+                            </button>
+                        }
+                        <div>
+                            <span style="font-size:.72rem;color:var(--warm-gray);margin-right:.5rem">Total</span>
+                            <span class="admin-price" style="font-size:1.1rem">£@o.Total.ToString("N2")</span>
+                        </div>
+                    </div>
+                </div>
+
+                @if (CancellingOrderNumber == o.OrderNumber)
+                {
+                    <div style="padding:.8rem 1.2rem;background:#fef2f2;border-top:1px solid #fca5a5">
+                        <div style="font-size:.78rem;font-weight:500;color:#dc2626;margin-bottom:.5rem">
+                            Cancel this order?
+                        </div>
+                        <input @bind="CancelReason" placeholder="Reason (optional)"
+                               style="width:100%;padding:.5rem;font-size:.74rem;border:1px solid #fca5a5;margin-bottom:.5rem" />
+                        <div style="display:flex;gap:.5rem">
+                            <button class="btn btn-outline" style="font-size:.62rem;flex:1"
+                                    @onclick="() => CancellingOrderNumber = string.Empty">Keep Order</button>
+                            <button class="btn btn-dark" style="font-size:.62rem;flex:1;background:#dc2626;border-color:#dc2626"
+                                    @onclick="() => ConfirmCancel(o.OrderNumber)" disabled="@CancelWorking">
+                                @(CancelWorking ? "Cancelling…" : "Yes, Cancel")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    bool   Loading     = false;
+    bool   Searched    = false;
+    string EmailInput       = "";
+    string OrderNumberInput = "";
+    string SearchedEmail    = "";
+    string Error       = "";
+    List<OrderResponse> Orders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsLoggedIn && !string.IsNullOrEmpty(Auth.Email))
+        {
+            EmailInput = Auth.Email;
+            await Search();
+        }
+    }
+
+    async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await Search();
+    }
+
+    async Task Search()
+    {
+        Error = "";
+        var email = Auth.IsLoggedIn ? Auth.Email : EmailInput.Trim();
+
+        // Order number lookup
+        if (!string.IsNullOrWhiteSpace(OrderNumberInput))
+        {
+            Loading = true;
+            try
+            {
+                var order = await Api.GetOrderAsync(OrderNumberInput.Trim());
+                Orders = order != null ? new List<OrderResponse> { order } : new();
+                Searched = true;
+            }
+            catch { Error = "Order not found."; }
+            finally { Loading = false; }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            Error = "Please enter your email address.";
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var list = await Api.GetMyOrdersAsync(email);
+            Orders       = list?.ToList() ?? new();
+            SearchedEmail = email;
+            Searched     = true;
+        }
+        catch { Error = "Could not load orders. Please try again."; }
+        finally { Loading = false; }
+    }
+
+    void Reset() { Searched = false; Orders.Clear(); Error = ""; OrderNumberInput = ""; }
+
+    // ── Cancel ────────────────────────────────────────────────────
+    string CancellingOrderNumber = string.Empty;
+    string CancelReason          = string.Empty;
+    bool   CancelWorking         = false;
+
+    void StartCancel(string orderNumber)
+    {
+        CancellingOrderNumber = orderNumber;
+        CancelReason          = string.Empty;
+    }
+
+    async Task ConfirmCancel(string orderNumber)
+    {
+        CancelWorking = true;
+        try
+        {
+            var ok = await Api.CancelOrderCustomerAsync(orderNumber, CancelReason);
+            if (ok)
+            {
+                CancellingOrderNumber = string.Empty;
+                await Search();
+            }
+            else Error = "Could not cancel order. Please contact us.";
+        }
+        catch { Error = "An error occurred. Please contact us."; }
+        finally { CancelWorking = false; }
+    }
+}

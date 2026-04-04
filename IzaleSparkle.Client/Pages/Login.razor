@@ -1,0 +1,106 @@
+@page "/login"
+@inject IApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Sign In — Izale Sparkle</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <a href="/" class="auth-logo">Izale <span class="gold">✦</span> Sparkle</a>
+            <div class="auth-tagline">Where Every Look Sparkles</div>
+        </div>
+
+        <h1 class="auth-title">Welcome Back</h1>
+        <p class="auth-subtitle">Sign in to your account</p>
+
+        @if (!string.IsNullOrEmpty(ErrorMsg))
+        {
+            <div class="auth-error">⚠️ @ErrorMsg</div>
+        }
+
+        <div class="auth-form">
+            <div class="auth-field">
+                <label>Email Address</label>
+                <input type="email" inputmode="email" autocomplete="email"
+                       @bind="Email" placeholder="your@email.com"
+                       class="@(ShowErr && string.IsNullOrWhiteSpace(Email) ? "field-error" : "")" />
+            </div>
+            <div class="auth-field">
+                <label>Password</label>
+                <div class="auth-pass-wrap">
+                    <input type="@(ShowPass ? "text" : "password")" autocomplete="current-password"
+                           @bind="Password" placeholder="••••••••"
+                           class="@(ShowErr && string.IsNullOrWhiteSpace(Password) ? "field-error" : "")"
+                           @onkeydown="OnKeyDown" />
+                    <button type="button" class="auth-pass-toggle"
+                            @onclick="() => ShowPass = !ShowPass">
+                        @(ShowPass ? "🙈" : "👁")
+                    </button>
+                </div>
+            </div>
+
+            <button class="auth-submit-btn" @onclick="DoLogin" disabled="@Loading">
+                @(Loading ? "Signing in…" : "Sign In ✦")
+            </button>
+        </div>
+
+        <div class="auth-links">
+            <span>Don't have an account?</span>
+            <a href="/register">Create Account</a>
+        </div>
+
+        <div class="auth-divider"><span>or</span></div>
+
+        <div class="auth-links" style="justify-content:center">
+            <a href="/admin/login" style="font-size:.65rem;color:var(--warm-gray)">Admin Login →</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    string Email    = "";
+    string Password = "";
+    string ErrorMsg = "";
+    bool   Loading  = false;
+    bool   ShowErr  = false;
+    bool   ShowPass = false;
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsLoggedIn)
+            Nav.NavigateTo(ReturnUrl ?? "/");
+    }
+
+    async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+
+    async Task DoLogin()
+    {
+        ShowErr  = false;
+        ErrorMsg = "";
+
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        { ShowErr = true; ErrorMsg = "Please enter your email and password."; return; }
+
+        Loading = true;
+        try
+        {
+            var result = await Api.LoginAsync(new LoginRequest(Email, Password));
+            if (result?.Success == true && result.Token != null)
+            {
+                await Auth.SetTokenAsync(JS, result.Token);
+                Nav.NavigateTo(ReturnUrl ?? "/");
+            }
+            else ErrorMsg = result?.Message ?? "Invalid email or password.";
+        }
+        catch { ErrorMsg = "Unable to connect. Please try again."; }
+        finally { Loading = false; }
+    }
+}

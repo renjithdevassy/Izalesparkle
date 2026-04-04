@@ -1,0 +1,241 @@
+@page "/"
+@inject IApiClient Api
+@inject ProductService FallbackSvc
+
+<PageTitle>Izale Sparkle — Where Every Look Sparkles</PageTitle>
+
+<!-- ══ HERO ══ -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-eyebrow">
+            <div class="eyebrow-line"></div>
+            <span>New Sparkle Collection — 2024</span>
+        </div>
+        <h1 class="hero-title">
+            <span class="hero-script">Where Every</span>
+            Look <em>Sparkles.</em>
+        </h1>
+        <p class="hero-desc">Fine jewellery crafted for the woman who believes every look deserves to shine. Ethically sourced gemstones, 18K gold, handcrafted with love.</p>
+        <div class="hero-btns">
+            <a href="/shop" class="btn btn-dark btn-full-mobile">Shop Collection</a>
+            <a href="/about" class="btn btn-outline-gold">Our Story</a>
+        </div>
+        <div class="hero-stats">
+            <div class="stat"><div class="stat-num">200+</div><div class="stat-label">Unique Pieces</div></div>
+            <div class="stat"><div class="stat-num">12K+</div><div class="stat-label">Happy Clients</div></div>
+            <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Conflict-Free</div></div>
+        </div>
+    </div>
+    <div class="hero-img-mobile">
+        <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=900&q=85" alt="Izale Sparkle Fine Jewellery" loading="eager" fetchpriority="high" />
+        <div class="hero-img-mobile-overlay"></div>
+    </div>
+    <div class="hero-img-side">
+        <div class="hero-img-frame">
+            <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=900&q=85" alt="Izale Sparkle Fine Jewellery" loading="eager" />
+            <div class="hero-sparkles">
+                <span class="sparkle-dot s1">✦</span>
+                <span class="sparkle-dot s2">✦</span>
+                <span class="sparkle-dot s3">✦</span>
+                <span class="sparkle-dot s4">✦</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══ MARQUEE ══ -->
+<div class="marquee-bar" aria-hidden="true">
+    <div class="marquee-track">
+        @foreach (var item in MarqueeItems.Concat(MarqueeItems))
+        {
+            <span class="marquee-item">@item</span>
+            <span class="marquee-sep">✦</span>
+        }
+    </div>
+</div>
+
+<!-- ══ CATEGORIES ══ -->
+<section class="section bg-cream cat-section">
+    <div class="section-head">
+        <span class="section-tag">✦ Browse ✦</span>
+        <h2 class="section-title">Shop by <em>Category</em></h2>
+        <div class="sparkle-divider"><span>✦</span></div>
+    </div>
+    <div class="cat-scroll-wrap">
+        @foreach (var cat in Categories)
+        {
+            <a href="/shop?cat=@cat.Key" class="cat-tile-mobile">
+                <img src="@cat.Img" alt="@cat.Label" loading="lazy" />
+                <div class="cat-overlay"></div>
+                <div class="cat-info">
+                    <div class="cat-name">@cat.Label</div>
+                    <div class="cat-count">@cat.Count Pieces</div>
+                </div>
+            </a>
+        }
+    </div>
+    <div class="cat-grid">
+        @foreach (var cat in Categories)
+        {
+            <a href="/shop?cat=@cat.Key" class="cat-tile @(cat.Key == "rings" ? "cat-tile-large" : "")">
+                <img src="@cat.Img" alt="@cat.Label" class="cat-tile-img" loading="lazy" />
+                <div class="cat-overlay"></div>
+                <div class="cat-info">
+                    <div class="cat-name">@cat.Label</div>
+                    <div class="cat-count">@cat.Count Pieces</div>
+                    <div class="cat-arrow">Explore ✦</div>
+                </div>
+            </a>
+        }
+    </div>
+</section>
+
+<!-- ══ FEATURED PRODUCTS ══ -->
+<section class="section bg-white">
+    <div class="section-head">
+        <span class="section-tag">✦ Featured ✦</span>
+        <h2 class="section-title">New <em>Arrivals</em></h2>
+        <div class="sparkle-divider"><span>✦</span></div>
+        <p class="section-subtitle">Each piece handcrafted with conflict-free stones and 18K gold.</p>
+    </div>
+    @if (Loading)
+    {
+        <div class="loading-screen" style="min-height:300px">
+            <div class="loading-spinner">✦</div>
+        </div>
+    }
+    else
+    {
+        <div class="product-grid grid-4">
+            @foreach (var (product, idx) in Featured.Select((p, i) => (p, i)))
+            {
+                <ProductCard Summary="@product" DelayMs="@(idx * 80)" />
+            }
+        </div>
+        <div class="section-cta">
+            <a href="/shop" class="btn btn-outline">View All Pieces</a>
+        </div>
+    }
+</section>
+
+<!-- ══ EDITORIAL ══ -->
+<div class="editorial-strip reveal">
+    <div class="editorial-img">
+        <img src="https://images.unsplash.com/photo-1573408301185-9519f94bf22b?w=900&q=80" alt="Craftsmanship" loading="lazy" />
+    </div>
+    <div class="editorial-content">
+        <p class="editorial-tag">Our Promise</p>
+        <h2 class="editorial-title">Ethically Sourced.<br /><em>Endlessly Beautiful.</em></h2>
+        <p class="editorial-body">Every stone we set is certified conflict-free. Every piece leaves our hands with a certificate of authenticity and the promise of craftsmanship that will outlast generations.</p>
+        <a href="/about" class="btn btn-outline-light">Our Story</a>
+    </div>
+</div>
+
+<!-- ══ USP BAR ══ -->
+<div class="usp-bar">
+    <div class="usp-item"><div class="usp-icon">🚚</div><div class="usp-title">Free Delivery</div><div class="usp-desc">Insured shipping on all UK orders</div></div>
+    <div class="usp-item"><div class="usp-icon">🔁</div><div class="usp-title">30-Day Returns</div><div class="usp-desc">No questions asked</div></div>
+    <div class="usp-item"><div class="usp-icon">🛡️</div><div class="usp-title">Lifetime Guarantee</div><div class="usp-desc">Every piece backed for life</div></div>
+    <div class="usp-item"><div class="usp-icon">✒️</div><div class="usp-title">Free Engraving</div><div class="usp-desc">Personalise your piece</div></div>
+</div>
+
+<!-- ══ TESTIMONIALS ══ -->
+<section class="section bg-cream">
+    <div class="section-head">
+        <span class="section-tag">✦ Reviews ✦</span>
+        <h2 class="section-title">She Said <em>Sparkle</em></h2>
+        <div class="sparkle-divider"><span>✦</span></div>
+    </div>
+    <div class="testi-scroll">
+        <div class="testi-grid">
+            @foreach (var t in Testimonials)
+            {
+                <div class="testi-card">
+                    <div class="testi-stars">★★★★★</div>
+                    <div class="testi-quote">"</div>
+                    <div class="testi-text">@t.Text</div>
+                    <div class="testi-name">— @t.Author</div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<!-- ══ NEWSLETTER ══ -->
+<div class="newsletter-strip">
+    <h3>Join the <em>Sparkle</em> Circle</h3>
+    <p>Early access to new arrivals, exclusive events &amp; jewellery care tips.</p>
+    <div class="newsletter-form">
+        <input class="newsletter-input" type="email" inputmode="email" autocomplete="email"
+               placeholder="Your email address" @bind="EmailInput" />
+        <button class="newsletter-submit" @onclick="SubscribeAsync">Subscribe</button>
+    </div>
+    @if (!string.IsNullOrEmpty(SubscribeMsg))
+    {
+        <p style="color:#f0d080;margin-top:.8rem;font-size:.8rem">@SubscribeMsg</p>
+    }
+</div>
+
+@code {
+    bool Loading = true;
+    List<ProductSummaryResponse> Featured = new();
+    string EmailInput = "";
+    string SubscribeMsg = "";
+
+    record CategoryItem(string Key, string Label, string Img, string Count);
+    record TestiItem(string Text, string Author);
+
+    List<CategoryItem> Categories = new()
+    {
+        new("rings",     "Rings",     "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=800&q=80", "48"),
+        new("necklaces", "Necklaces", "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=600&q=80", "36"),
+        new("earrings",  "Earrings",  "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80", "52"),
+        new("bracelets", "Bracelets", "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=600&q=80", "29"),
+    };
+
+    List<string> MarqueeItems = new()
+    { "18K Gold Jewellery", "Conflict-Free Diamonds", "Handcrafted in London",
+      "Lifetime Warranty", "Free Engraving", "Bespoke Service", "Where Every Look Sparkles" };
+
+    List<TestiItem> Testimonials = new()
+    {
+        new("My engagement ring is absolutely breathtaking. Every time light hits it, I'm reminded why Izale Sparkle is the only name in fine jewellery.", "Amara K., London"),
+        new("I bought the sapphire pendant as a gift and the packaging alone was stunning. She cried happy tears. Service was exceptional.", "Sophie R., Manchester"),
+        new("The bespoke earrings they created for my wedding day were beyond anything I imagined. Truly where every look sparkles.", "Priya M., Birmingham"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // ── API CALL ──────────────────────────────────────────
+            var result = await Api.GetFeaturedAsync(4);
+            Featured = result?.ToList() ?? new();
+        }
+        catch
+        {
+            // Offline / API unavailable — fall back to in-memory data
+            Featured = FallbackSvc.GetFeatured(4)
+                .Select(p => new ProductSummaryResponse(p.Id, p.Name, p.Name.ToLower().Replace(" ","-"),
+                    p.Material, p.Price, p.OldPrice, p.Category, p.Badge,
+                    p.Stars, p.ImageUrl, p.IsOnSale, p.SavePercent)).ToList();
+        }
+        finally { Loading = false; }
+    }
+
+    async Task SubscribeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(EmailInput)) return;
+        try
+        {
+            // ── API CALL ──────────────────────────────────────────
+            var result = await Api.SubscribeAsync(EmailInput);
+            SubscribeMsg = result?.Data?.Message ?? "✦ Welcome to the Sparkle Circle!";
+        }
+        catch
+        {
+            SubscribeMsg = "✦ Welcome to the Sparkle Circle!";
+        }
+        EmailInput = "";
+    }
+}

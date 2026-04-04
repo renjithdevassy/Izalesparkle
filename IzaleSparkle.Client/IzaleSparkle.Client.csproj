@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>IzaleSparkle.Client</RootNamespace>
+    <AssemblyName>IzaleSparkle.Client</AssemblyName>
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+
+    <!--
+      IMPORTANT: PublishTrimmed must be false (or absent) in Debug.
+      Trimming strips the debug symbols and PDB info that the debugger needs
+      to map IL back to your .razor / .cs source lines.
+      Only enable trimming for Release / production publish.
+    -->
+    <PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
+
+    <!--
+      AOT only when explicitly requested at publish time:
+        dotnet publish -c Release /p:EnableAot=true
+      Requires: dotnet workload install wasm-tools
+    -->
+    <RunAOTCompilation Condition="'$(EnableAot)' == 'true'">true</RunAOTCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IzaleSparkle.Contracts\IzaleSparkle.Contracts.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0-preview.*" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ServiceWorker Include="wwwroot\service-worker.js"
+                   PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+</Project>

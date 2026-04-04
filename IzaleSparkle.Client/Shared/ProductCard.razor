@@ -1,0 +1,99 @@
+@inject CartService Cart
+@inject NavigationManager Nav
+
+<div class="product-card" style="animation-delay:@(DelayMs)ms">
+    <a href="/product/@Id" class="product-img-link">
+        <div class="product-img-wrap">
+            <img src="@ImageUrl" alt="@Name" loading="lazy" />
+            @if (!string.IsNullOrEmpty(Badge))
+            {
+                <span class="product-badge badge-@Badge">
+                    @(Badge == "new" ? "New In" : Badge == "sale" ? "Sale" : "Best Seller")
+                </span>
+            }
+            <div class="product-hover-overlay"><span>View Details →</span></div>
+        </div>
+    </a>
+    <div class="product-card-actions">
+        <button class="prod-add-btn" @onclick="AddToCart">Add to Cart</button>
+        <button class="prod-wish-btn @(IsWishlisted ? "wishlisted" : "")" @onclick="ToggleWish">
+            @(IsWishlisted ? "♥" : "♡")
+        </button>
+    </div>
+    <div class="product-card-info">
+        <div class="product-stars">@StarsDisplay</div>
+        <a href="/product/@Id" class="product-name-link">
+            <div class="product-name">@Name</div>
+        </a>
+        <div class="product-material">@Material</div>
+        <div class="product-price-row">
+            <span class="product-price">£@Price.ToString("N0")</span>
+            @if (IsOnSale && OldPrice.HasValue)
+            {
+                <span class="product-price-old">£@OldPrice.Value.ToString("N0")</span>
+            }
+            @if (IsOnSale && SavePercent.HasValue && SavePercent > 0)
+            {
+                <span class="product-save">-@SavePercent%</span>
+            }
+        </div>
+    </div>
+</div>
+
+@if (ShowToast)
+{
+    <div class="toast-popup">✦ @Name added to your sparkle!</div>
+}
+
+@code {
+    // ── Accept either a local Product model OR an API ProductSummaryResponse ──
+
+    // Option A: pass a local Product model
+    [Parameter] public Product? Product { get; set; }
+
+    // Option B: pass an API DTO directly
+    [Parameter] public ProductSummaryResponse? Summary { get; set; }
+
+    [Parameter] public int DelayMs { get; set; } = 0;
+
+    // Resolved display properties — work regardless of which parameter was supplied
+    int     Id          => Product?.Id          ?? Summary?.Id          ?? 0;
+    string  Name        => Product?.Name        ?? Summary?.Name        ?? "";
+    string  Material    => Product?.Material    ?? Summary?.Material    ?? "";
+    decimal Price       => Product?.Price       ?? Summary?.Price       ?? 0;
+    decimal? OldPrice   => Product?.OldPrice    ?? Summary?.OldPrice;
+    string? Badge       => Product?.Badge       ?? Summary?.Badge;
+    int     Stars       => Product?.Stars       ?? Summary?.Stars       ?? 5;
+    string  ImageUrl    => Product?.ImageUrl    ?? Summary?.ImageUrl    ?? "";
+    int?    SavePercent => Product?.SavePercent ?? Summary?.SavePercent;
+    bool    IsOnSale    => Product?.IsOnSale    ?? Summary?.IsOnSale    ?? false;
+    string  StarsDisplay => new string('★', Stars) + new string('☆', 5 - Stars);
+
+    bool IsWishlisted = false;
+    bool ShowToast    = false;
+
+    void AddToCart()
+    {
+        // Use local Product if available; otherwise build a minimal one from Summary
+        var p = Product ?? (Summary == null ? null : new Product
+        {
+            Id              = Summary.Id,
+            Name            = Summary.Name,
+            Material        = Summary.Material,
+            Price           = Summary.Price,
+            OldPrice        = Summary.OldPrice,
+            Badge           = Summary.Badge,
+            Category        = Summary.Category,
+            Stars           = Summary.Stars,
+            ImageUrl        = Summary.ImageUrl,
+            Images          = new List<string> { Summary.ImageUrl },
+            IsVatApplicable = Summary.IsVatApplicable,
+        });
+        if (p == null) return;
+        Cart.AddItem(p);
+        ShowToast = true;
+        Task.Delay(2500).ContinueWith(_ => { ShowToast = false; InvokeAsync(StateHasChanged); });
+    }
+
+    void ToggleWish() => IsWishlisted = !IsWishlisted;
+}

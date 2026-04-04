@@ -1,0 +1,118 @@
+@page "/collections"
+@inject IApiClient Api
+@inject ProductService FallbackSvc
+
+<PageTitle>Collections — Izale Sparkle</PageTitle>
+
+<!-- HERO -->
+<div class="collections-hero">
+    <div class="ch-bg-img"></div>
+    <div class="ch-deco" style="width:600px;height:600px"></div>
+    <div class="ch-deco" style="width:380px;height:380px;opacity:0.5"></div>
+    <div class="ch-content">
+        <span class="ch-tag">2024 Collections</span>
+        <h1 class="ch-title">Four Stories,<br /><em>One Sparkle.</em></h1>
+        <p class="ch-sub">Each collection is a mood, a moment, a memory made permanent in gold and stone. Where every look sparkles.</p>
+    </div>
+</div>
+
+<!-- COLLECTION ENTRIES -->
+@foreach (var (col, idx) in CollectionList.Select((c,i)=>(c,i)))
+{
+    <div class="col-entry @(idx % 2 == 1 ? "reversed" : "")">
+        <div class="col-img">
+            <img src="@col.Img" alt="@col.Name" loading="lazy" />
+        </div>
+        <div class="col-content" style="background:@col.Bg">
+            <div class="col-num" style="color:@col.NumColor">0@(idx+1)</div>
+            <div class="col-tag">@col.Tag</div>
+            <h2 class="col-name" style="color:@col.TextColor">@col.Name</h2>
+            <p class="col-desc" style="color:@col.DescColor">@col.Desc</p>
+            <div class="col-pieces" style="color:var(--gold)">@col.Pieces</div>
+            <a href="/shop" class="btn @col.BtnClass">Explore Collection</a>
+        </div>
+    </div>
+}
+
+<!-- LOOKBOOK -->
+<section class="section bg-cream">
+    <div class="section-head">
+        <span class="section-tag">✦ Lookbook ✦</span>
+        <h2 class="section-title">Worn with <em>Intention</em></h2>
+        <div class="sparkle-divider"><span>✦</span></div>
+    </div>
+    <div class="lookbook-grid">
+        @foreach (var img in LookbookImgs)
+        {
+            <div class="lb-item">
+                <img src="@img" alt="Lookbook" loading="lazy" />
+                <div class="lb-overlay"></div>
+            </div>
+        }
+    </div>
+</section>
+
+<!-- NEW ARRIVALS PREVIEW -->
+<section class="section bg-white">
+    <div class="section-head">
+        <span class="section-tag">✦ Shop Now ✦</span>
+        <h2 class="section-title">From the <em>Collections</em></h2>
+        <div class="sparkle-divider"><span>✦</span></div>
+    </div>
+    <div class="product-grid grid-4">
+        @foreach (var (p, i) in Featured.Select((x,i)=>(x,i)))
+        {
+            <ProductCard Summary="@p" DelayMs="@(i * 100)" />
+        }
+    </div>
+    <div class="section-cta">
+        <a href="/shop" class="btn btn-outline">View All Pieces</a>
+    </div>
+</section>
+
+@code {
+    record CollectionItem(string Name, string Tag, string Desc, string Pieces, string Img,
+        string Bg, string TextColor, string DescColor, string NumColor, string BtnClass);
+
+    List<CollectionItem> CollectionList = new()
+    {
+        new("Sparkle",   "New In — 2024",    "Our flagship collection — inspired by the belief that every look deserves to shine. White gold, diamond pavé and sapphires create an ethereal luminosity that catches every eye in the room.",    "32 Pieces in this Collection", "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=900&q=80", "var(--cream-soft)",  "var(--charcoal)", "var(--warm-gray)",  "rgba(200,151,58,0.1)",  "btn btn-dark"),
+        new("Solstice",  "Signature Series", "The warmth of midsummer rendered in yellow and rose gold. Fluid forms, sun-drenched gems, and the golden hour distilled into wearable art. Our most beloved series.",                            "48 Pieces in this Collection", "https://images.unsplash.com/photo-1573408301185-9519f94bf22b?w=900&q=80", "var(--cream)",       "var(--charcoal)", "var(--warm-gray)",  "rgba(200,151,58,0.12)", "btn btn-dark"),
+        new("Aurora",    "Limited Edition",  "Sapphires, tourmalines, and opals in cool white gold — capturing the shifting colours of the aurora borealis. Only 20 pieces crafted per year, each truly one-of-a-kind.",                    "20 Pieces — Limited",          "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=900&q=80", "var(--charcoal)",    "var(--cream-soft)","rgba(245,240,225,0.5)","rgba(200,151,58,0.1)",  "btn btn-outline-light"),
+        new("Heritage",  "Archive",          "Drawing from our archive, Heritage reimagines our most celebrated designs. Vintage silhouettes, antique rose cuts, and art-deco geometry reborn in modern precious metals.",                   "64 Pieces in this Collection", "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=900&q=80", "var(--cream-deep)",  "var(--charcoal)", "var(--warm-gray)",  "rgba(200,151,58,0.12)", "btn btn-dark"),
+    };
+
+    List<string> LookbookImgs = new()
+    {
+        "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=800&q=80",
+        "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80",
+        "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=600&q=80",
+        "https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?w=800&q=80",
+        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=600&q=80",
+        "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=600&q=80",
+        "https://images.unsplash.com/photo-1608042314453-ae338d9c6ad1?w=600&q=80",
+    };
+
+    List<ProductSummaryResponse> Featured = new();
+
+    bool Loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // ── API CALL ──────────────────────────────────────────
+            var result = await Api.GetFeaturedAsync(4);
+            Featured = result?.ToList() ?? new();
+        }
+        catch
+        {
+            Featured = FallbackSvc.GetFeatured(4)
+                .Select(p => new ProductSummaryResponse(p.Id, p.Name,
+                    p.Name.ToLower().Replace(" ","-"), p.Material,
+                    p.Price, p.OldPrice, p.Category, p.Badge,
+                    p.Stars, p.ImageUrl, p.IsOnSale, p.SavePercent)).ToList();
+        }
+        finally { Loading = false; }
+    }
+}

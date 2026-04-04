@@ -1,0 +1,404 @@
+@page "/admin/stock"
+@layout AdminLayout
+@inject IApiClient Api
+@inject NavigationManager Nav
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Stock Control</h1>
+    <button class="btn btn-gold" style="font-size:.68rem" @onclick='() => ShowAddPurchase = true'>
+        + Record Purchase
+    </button>
+</div>
+
+@if (Report != null)
+{
+    <!-- ── STAT CARDS ── -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">💷</div>
+            <div class="asc-num">£@Report.TotalStockValue.ToString("N0")</div>
+            <div class="asc-label">Stock Value (RRP)</div>
+            <div class="asc-sub">£@Report.TotalCostValue.ToString("N0") cost</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">✅</div>
+            <div class="asc-num">@Report.InStockProducts</div>
+            <div class="asc-label">In Stock</div>
+            <div class="asc-sub">of @Report.TotalProducts products</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">⚠️</div>
+            <div class="asc-num">@Report.LowStockProducts</div>
+            <div class="asc-label">Low Stock</div>
+            <div class="asc-sub">At or below reorder point</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">❌</div>
+            <div class="asc-num">@Report.OutOfStockProducts</div>
+            <div class="asc-label">Out of Stock</div>
+            <div class="asc-sub">Needs restocking</div>
+        </div>
+    </div>
+
+    <!-- ── FILTER PILLS ── -->
+    <div class="order-pipeline" style="margin-bottom:1rem">
+        <button class="order-pipeline-step @(Filter == string.Empty ? "active" : "")"
+                @onclick="ShowAll">
+            <span class="ops-icon">🔢</span><span class="ops-label">All</span>
+            <span class="ops-count">@Report.TotalProducts</span>
+        </button>
+        <button class="order-pipeline-step @(Filter == "out" ? "active" : "")"
+                @onclick='() => SetFilter("out")'>
+            <span class="ops-icon">❌</span><span class="ops-label">Out of Stock</span>
+            <span class="ops-count">@Report.OutOfStockProducts</span>
+        </button>
+        <button class="order-pipeline-step @(Filter == "low" ? "active" : "")"
+                @onclick='() => SetFilter("low")'>
+            <span class="ops-icon">⚠️</span><span class="ops-label">Low Stock</span>
+            <span class="ops-count">@Report.LowStockProducts</span>
+        </button>
+        <button class="order-pipeline-step @(Filter == "instock" ? "active" : "")"
+                @onclick='() => SetFilter("instock")'>
+            <span class="ops-icon">✅</span><span class="ops-label">In Stock</span>
+            <span class="ops-count">@Report.InStockProducts</span>
+        </button>
+    </div>
+
+    <!-- ── STOCK TABLE ── -->
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Stock</th>
+                    <th>Reorder Point</th>
+                    <th>Supplier</th>
+                    <th>Cost Price</th>
+                    <th>Stock Value</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Report.Products)
+                {
+                    <tr>
+                        <td>
+                            <div class="admin-product-cell">
+                                <img src="@p.ImageUrl" alt="@p.ProductName" class="admin-product-thumb" />
+                                <div>
+                                    <div class="admin-product-name">@p.ProductName</div>
+                                    <div class="admin-product-material">@p.Category</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="stock-level-wrap">
+                                <span class="stock-badge @(p.OutOfStock ? "out" : p.LowStock ? "low" : "ok")">
+                                    @p.StockLevel
+                                </span>
+                                @if (p.LowStock)  { <span style="font-size:.6rem;color:#92400e">⚠ Low</span> }
+                                @if (p.OutOfStock){ <span style="font-size:.6rem;color:#991b1b">✕ Out</span> }
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size:.78rem">@p.ReorderPoint units</div>
+                            <div style="font-size:.62rem;color:var(--warm-gray)">@p.LeadTimeDays day lead</div>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--warm-gray)">
+                            @(p.Supplier ?? "—")
+                            @if (!string.IsNullOrEmpty(p.SupplierSku))
+                            { <div style="font-size:.62rem">SKU: @p.SupplierSku</div> }
+                        </td>
+                        <td>
+                            @if (p.CostPrice.HasValue)
+                            { <div class="admin-price">£@p.CostPrice.Value.ToString("N2")</div> }
+                            else { <span style="color:rgba(122,110,95,.3);font-size:.68rem">—</span> }
+                        </td>
+                        <td>
+                            @if (p.CostPrice.HasValue)
+                            {
+                                <div class="admin-price">£@((p.CostPrice.Value * p.StockLevel).ToString("N2"))</div>
+                                <div style="font-size:.62rem;color:var(--warm-gray)">cost value</div>
+                            }
+                            else { <span style="color:rgba(122,110,95,.3);font-size:.68rem">—</span> }
+                        </td>
+                        <td>
+                            <div class="admin-actions">
+                                <button class="admin-action-btn"
+                                        @onclick="() => OpenAddPurchase(p.ProductId, p.ProductName)">
+                                    + Stock
+                                </button>
+                                <button class="admin-action-btn"
+                                        @onclick="() => OpenAdjust(p.ProductId, p.ProductName, p.StockLevel)">
+                                    Adjust
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Report.Products.Any())
+                {
+                    <tr><td colspan="7" class="admin-empty">No products match this filter.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── PURCHASE HISTORY ── -->
+    @if (Purchases.Any())
+    {
+        <div class="admin-section" style="margin-top:1.5rem">
+            <div class="admin-section-head">
+                <h2>Recent Purchase Records</h2>
+            </div>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Product</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Supplier</th><th>Reference</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pu in Purchases.Take(20))
+                        {
+                            <tr>
+                                <td style="font-size:.82rem;font-weight:500">@pu.ProductName</td>
+                                <td style="font-family:'Playfair Display',serif;font-size:1rem">@pu.Quantity</td>
+                                <td>£@pu.UnitCost.ToString("N2")</td>
+                                <td class="admin-price">£@pu.TotalCost.ToString("N2")</td>
+                                <td style="font-size:.74rem;color:var(--warm-gray)">@(pu.Supplier ?? "—")</td>
+                                <td style="font-size:.68rem;color:var(--warm-gray)">@(pu.Reference ?? "—")</td>
+                                <td style="font-size:.72rem;color:var(--warm-gray)">@pu.PurchasedOn.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+else if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+
+@if (!string.IsNullOrEmpty(SuccessMsg))
+{ <div class="admin-success-banner" style="margin-top:1rem">✓ @SuccessMsg</div> }
+@if (!string.IsNullOrEmpty(ErrorMsg))
+{ <div class="admin-error-banner" style="margin-top:1rem">⚠️ @ErrorMsg</div> }
+
+<!-- ── ADD PURCHASE MODAL ── -->
+@if (ShowAddPurchase)
+{
+    <div class="admin-modal-overlay" @onclick="CloseModals">
+        <div class="admin-modal" style="max-width:480px;text-align:left" @onclick:stopPropagation>
+            <h3 class="admin-modal-title" style="text-align:left;margin-bottom:1.5rem">
+                Record Stock Purchase
+                @if (!string.IsNullOrEmpty(PurchaseProductName))
+                { <div style="font-size:.72rem;color:var(--warm-gray);font-family:'Raleway',sans-serif;margin-top:.2rem">@PurchaseProductName</div> }
+            </h3>
+
+            @if (PurchaseProductId == 0)
+            {
+                <div class="admin-field">
+                    <label>Product *</label>
+                    <select @bind="PurchaseProductId" class="admin-select" style="width:100%">
+                        <option value="0">— Select product —</option>
+                        @if (Report != null)
+                        {
+                            @foreach (var p in Report.Products.OrderBy(x => x.ProductName))
+                            {
+                                <option value="@p.ProductId">@p.ProductName (stock: @p.StockLevel)</option>
+                            }
+                        }
+                    </select>
+                </div>
+            }
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Quantity *</label>
+                    <input type="number" @bind="PurchaseQty" min="1" step="1" />
+                </div>
+                <div class="admin-field">
+                    <label>Unit Cost (£) *</label>
+                    <input type="number" @bind="PurchaseUnitCost" min="0" step="0.01" />
+                </div>
+            </div>
+
+            @if (PurchaseQty > 0 && PurchaseUnitCost > 0)
+            {
+                <div style="background:rgba(200,151,58,.08);border:1px solid var(--border);padding:.7rem 1rem;font-size:.74rem;margin-bottom:.8rem;border-radius:4px">
+                    Total purchase: <strong>£@((PurchaseQty * PurchaseUnitCost).ToString("N2"))</strong>
+                    for @PurchaseQty unit@(PurchaseQty == 1 ? "" : "s")
+                </div>
+            }
+
+            <div class="admin-field">
+                <label>Supplier</label>
+                <input @bind="PurchaseSupplier" placeholder="Supplier name" />
+            </div>
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Reference / PO Number</label>
+                    <input @bind="PurchaseReference" placeholder="INV-001" />
+                </div>
+                <div class="admin-field">
+                    <label>Purchase Date</label>
+                    <input type="date" @bind="PurchaseDate" />
+                </div>
+            </div>
+            <div class="admin-field">
+                <label>Notes</label>
+                <textarea @bind="PurchaseNotes" rows="2" placeholder="Optional notes…"></textarea>
+            </div>
+
+            <div class="admin-modal-actions" style="justify-content:flex-end">
+                <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
+                <button class="btn btn-gold" @onclick="SavePurchase" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Record Purchase")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── ADJUST STOCK MODAL ── -->
+@if (ShowAdjust)
+{
+    <div class="admin-modal-overlay" @onclick="CloseModals">
+        <div class="admin-modal" style="max-width:360px;text-align:left" @onclick:stopPropagation>
+            <h3 class="admin-modal-title" style="text-align:left">Adjust Stock Level</h3>
+            <div style="font-size:.72rem;color:var(--warm-gray);margin-bottom:1.2rem">@AdjustProductName</div>
+            <div class="admin-field">
+                <label>New Stock Level</label>
+                <input type="number" @bind="AdjustNewLevel" min="0" step="1" />
+            </div>
+            <div class="admin-field">
+                <label>Reason (optional)</label>
+                <input @bind="AdjustReason" placeholder="e.g. Damaged item, stock count correction…" />
+            </div>
+            <div class="admin-modal-actions" style="justify-content:flex-end">
+                <button class="btn btn-outline" @onclick="CloseModals">Cancel</button>
+                <button class="btn btn-dark" @onclick="SaveAdjust" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save Adjustment")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool Loading = true;
+    bool Saving  = false;
+    string Filter     = string.Empty;
+    string SuccessMsg = string.Empty;
+    string ErrorMsg   = string.Empty;
+
+    StockReportResponse? Report;
+    List<StockPurchaseResponse> Purchases = new();
+
+    // Add purchase modal
+    bool     ShowAddPurchase    = false;
+    int      PurchaseProductId  = 0;
+    string   PurchaseProductName= string.Empty;
+    int      PurchaseQty        = 1;
+    decimal  PurchaseUnitCost   = 0;
+    string   PurchaseSupplier   = string.Empty;
+    string   PurchaseReference  = string.Empty;
+    string   PurchaseNotes      = string.Empty;
+    DateTime PurchaseDate       = DateTime.Today;
+
+    // Adjust modal
+    bool    ShowAdjust       = false;
+    int     AdjustProductId  = 0;
+    string  AdjustProductName= string.Empty;
+    int     AdjustNewLevel   = 0;
+    string  AdjustReason     = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    async Task LoadData()
+    {
+        Loading = true;
+        try
+        {
+            Report    = await Api.GetStockReportAsync(Filter == string.Empty ? null : Filter);
+            Purchases = (await Api.GetStockPurchasesAsync())?.ToList() ?? new();
+        }
+        catch { ErrorMsg = "Failed to load stock data."; }
+        finally { Loading = false; }
+    }
+
+    async Task ShowAll()  { Filter = string.Empty; await LoadData(); }
+    async Task SetFilter(string f) { Filter = f; await LoadData(); }
+
+    void OpenAddPurchase(int id, string name)
+    {
+        PurchaseProductId   = id;
+        PurchaseProductName = name;
+        PurchaseQty         = 1;
+        PurchaseUnitCost    = 0;
+        PurchaseSupplier    = string.Empty;
+        PurchaseReference   = string.Empty;
+        PurchaseNotes       = string.Empty;
+        PurchaseDate        = DateTime.Today;
+        ShowAddPurchase     = true;
+    }
+
+    void OpenAdjust(int id, string name, int current)
+    {
+        AdjustProductId   = id;
+        AdjustProductName = name;
+        AdjustNewLevel    = current;
+        AdjustReason      = string.Empty;
+        ShowAdjust        = true;
+    }
+
+    void CloseModals() { ShowAddPurchase = false; ShowAdjust = false; }
+
+    async Task SavePurchase()
+    {
+        if (PurchaseProductId == 0 || PurchaseQty <= 0) return;
+        Saving = true;
+        ErrorMsg = SuccessMsg = string.Empty;
+        try
+        {
+            var req = new AddStockPurchaseRequest(
+                PurchaseProductId, PurchaseQty, PurchaseUnitCost,
+                string.IsNullOrWhiteSpace(PurchaseSupplier)  ? null : PurchaseSupplier,
+                string.IsNullOrWhiteSpace(PurchaseReference) ? null : PurchaseReference,
+                string.IsNullOrWhiteSpace(PurchaseNotes)     ? null : PurchaseNotes,
+                PurchaseDate);
+
+            var result = await Api.AddStockPurchaseAsync(req);
+            if (result?.Success == true)
+            {
+                SuccessMsg = $"Recorded {PurchaseQty} unit(s) for {PurchaseProductName}.";
+                ShowAddPurchase = false;
+                await LoadData();
+            }
+            else ErrorMsg = result?.Message ?? "Failed to record purchase.";
+        }
+        catch { ErrorMsg = "An error occurred."; }
+        finally { Saving = false; }
+    }
+
+    async Task SaveAdjust()
+    {
+        if (AdjustProductId == 0) return;
+        Saving = true;
+        ErrorMsg = SuccessMsg = string.Empty;
+        try
+        {
+            var result = await Api.AdjustStockAsync(AdjustProductId, AdjustNewLevel, AdjustReason);
+            if (result?.Success == true)
+            {
+                SuccessMsg = $"Stock level set to {AdjustNewLevel} for {AdjustProductName}.";
+                ShowAdjust = false;
+                await LoadData();
+            }
+            else ErrorMsg = result?.Message ?? "Adjustment failed.";
+        }
+        catch { ErrorMsg = "An error occurred."; }
+        finally { Saving = false; }
+    }
+}

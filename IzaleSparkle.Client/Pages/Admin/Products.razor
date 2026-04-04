@@ -1,0 +1,191 @@
+@page "/admin/products"
+@layout AdminLayout
+@inject IApiClient Api
+@inject NavigationManager Nav
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Products <span class="admin-count-badge">@ProductList.Count</span></h1>
+    <a href="/admin/products/new" class="btn btn-gold" style="font-size:.68rem">+ New Product</a>
+</div>
+
+<!-- FILTERS -->
+<div class="admin-filters">
+    <input class="admin-search" type="search" placeholder="Search products…"
+           @bind="SearchQuery" @bind:event="oninput" />
+    <select class="admin-select" @bind="CategoryFilter">
+        <option value="">All Categories</option>
+        @foreach (var cat in AdminCategories)
+        {
+            <option value="@cat.Slug">@cat.Name</option>
+        }
+    </select>
+    <select class="admin-select" @bind="StatusFilter">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
+    </select>
+</div>
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Cost / Margin</th>
+                    <th>Badge</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Filtered)
+                {
+                    <tr>
+                        <td>
+                            <div class="admin-product-cell">
+                                <img src="@p.ImageUrl" alt="@p.Name" class="admin-product-thumb" />
+                                <div>
+                                    <div class="admin-product-name">@p.Name</div>
+                                    <div class="admin-product-material">@p.Material</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="admin-badge-chip">@p.Category</span></td>
+                        <td>
+                            <div class="admin-price">£@p.Price.ToString("N0")</div>
+                            @if (p.OldPrice.HasValue)
+                            {
+                                <div class="admin-price-old">£@p.OldPrice.Value.ToString("N0")</div>
+                            }
+                        </td>
+                        <td>
+                            @if (p.CostPrice.HasValue)
+                            {
+                                <div style="font-size:.72rem;color:var(--warm-gray)">£@p.CostPrice.Value.ToString("N0") cost</div>
+                                @if (p.MarginPercent.HasValue)
+                                {
+                                    <div class="cost-margin-badge @(p.MarginPercent >= 50 ? "good" : p.MarginPercent >= 25 ? "ok" : "low")" style="font-size:.58rem;padding:.15rem .5rem">
+                                        @p.MarginPercent%
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <span style="color:rgba(122,110,95,.3);font-size:.68rem">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(p.Badge))
+                            {
+                                <span class="admin-badge-chip badge-@p.Badge">@p.Badge</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="admin-status @(p.IsActive ? "active" : "inactive")">
+                                @(p.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>
+                            <div class="admin-actions">
+                                <a href="/admin/products/edit/@p.Id" class="admin-action-btn">Edit</a>
+                                <button class="admin-action-btn danger"
+                                        @onclick="() => ConfirmDelete(p)">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Filtered.Any())
+                {
+                    <tr><td colspan="6" class="admin-empty">No products found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- DELETE CONFIRM MODAL -->
+@if (DeleteTarget != null)
+{
+    <div class="admin-modal-overlay" @onclick="CancelDelete">
+        <div class="admin-modal" @onclick:stopPropagation>
+            <div class="admin-modal-icon">⚠️</div>
+            <h3 class="admin-modal-title">Delete Product?</h3>
+            <p class="admin-modal-body">
+                Are you sure you want to delete <strong>@DeleteTarget.Name</strong>?
+                This cannot be undone.
+            </p>
+            <div class="admin-modal-actions">
+                <button class="btn btn-outline" @onclick="CancelDelete">Cancel</button>
+                <button class="btn btn-dark" style="background:#c0392b" @onclick="ExecuteDelete"
+                        disabled="@Deleting">
+                    @(Deleting ? "Deleting…" : "Delete")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool Loading = true;
+    bool Deleting = false;
+    List<AdminProductResponse> ProductList = new();
+    AdminProductResponse? DeleteTarget;
+    string SearchQuery = "";
+    string CategoryFilter = "";
+    List<CategoryResponse> AdminCategories = new();
+    string StatusFilter = "";
+
+    IEnumerable<AdminProductResponse> Filtered => ProductList
+        .Where(p => string.IsNullOrEmpty(SearchQuery)
+            || p.Name.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)
+            || p.Material.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+        .Where(p => string.IsNullOrEmpty(CategoryFilter) || p.Category == CategoryFilter)
+        .Where(p => StatusFilter switch
+        {
+            "active"   => p.IsActive,
+            "inactive" => !p.IsActive,
+            _          => true
+        });
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    async Task LoadProducts()
+    {
+        Loading = true;
+        try
+        {
+            ProductList    = (await Api.GetAdminProductsAsync())?.ToList() ?? new();
+            AdminCategories= (await Api.GetAdminCategoriesAsync())?.ToList() ?? new();
+        }
+        catch { }
+        finally { Loading = false; }
+    }
+
+    void ConfirmDelete(AdminProductResponse p) => DeleteTarget = p;
+    void CancelDelete()                         => DeleteTarget = null;
+
+    async Task ExecuteDelete()
+    {
+        if (DeleteTarget == null) return;
+        Deleting = true;
+        try
+        {
+            await Api.DeleteProductAsync(DeleteTarget.Id);
+            ProductList.Remove(DeleteTarget);
+            DeleteTarget = null;
+        }
+        catch { }
+        finally { Deleting = false; }
+    }
+}

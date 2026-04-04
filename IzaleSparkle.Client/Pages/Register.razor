@@ -1,0 +1,158 @@
+@page "/register"
+@inject IApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Create Account — Izale Sparkle</PageTitle>
+
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <a href="/" class="auth-logo">Izale <span class="gold">✦</span> Sparkle</a>
+            <div class="auth-tagline">Where Every Look Sparkles</div>
+        </div>
+
+        <h1 class="auth-title">Create Account</h1>
+        <p class="auth-subtitle">Join the Sparkle Circle</p>
+
+        @if (!string.IsNullOrEmpty(ErrorMsg))
+        {
+            <div class="auth-error">⚠️ @ErrorMsg</div>
+        }
+        @if (!string.IsNullOrEmpty(SuccessMsg))
+        {
+            <div class="auth-success">✦ @SuccessMsg</div>
+        }
+
+        <div class="auth-form">
+            <div class="auth-field-row">
+                <div class="auth-field">
+                    <label>First Name</label>
+                    <input type="text" autocomplete="given-name"
+                           @bind="FirstName" placeholder="First name"
+                           class="@(ShowErr && string.IsNullOrWhiteSpace(FirstName) ? "field-error" : "")" />
+                </div>
+                <div class="auth-field">
+                    <label>Last Name</label>
+                    <input type="text" autocomplete="family-name"
+                           @bind="LastName" placeholder="Last name"
+                           class="@(ShowErr && string.IsNullOrWhiteSpace(LastName) ? "field-error" : "")" />
+                </div>
+            </div>
+
+            <div class="auth-field">
+                <label>Email Address</label>
+                <input type="email" inputmode="email" autocomplete="email"
+                       @bind="Email" placeholder="your@email.com"
+                       class="@(ShowErr && string.IsNullOrWhiteSpace(Email) ? "field-error" : "")" />
+            </div>
+
+            <div class="auth-field">
+                <label>Password <small>min. 8 characters</small></label>
+                <div class="auth-pass-wrap">
+                    <input type="@(ShowPass ? "text" : "password")" autocomplete="new-password"
+                           @bind="Password" placeholder="••••••••"
+                           class="@(ShowErr && Password.Length < 8 ? "field-error" : "")" />
+                    <button type="button" class="auth-pass-toggle"
+                            @onclick="() => ShowPass = !ShowPass">
+                        @(ShowPass ? "🙈" : "👁")
+                    </button>
+                </div>
+                @if (Password.Length > 0)
+                {
+                    <div class="auth-strength">
+                        <div class="auth-strength-bar">
+                            <div class="auth-strength-fill @StrengthClass" style="width:@(PasswordStrength * 25)%"></div>
+                        </div>
+                        <span class="auth-strength-label">@StrengthLabel</span>
+                    </div>
+                }
+            </div>
+
+            <div class="auth-field">
+                <label>Confirm Password</label>
+                <input type="@(ShowPass ? "text" : "password")" autocomplete="new-password"
+                       @bind="ConfirmPassword" placeholder="••••••••"
+                       class="@(ShowErr && ConfirmPassword != Password ? "field-error" : "")" />
+            </div>
+
+            <label class="auth-chk">
+                <input type="checkbox" @bind="AgreeTerms" />
+                <span>I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a></span>
+            </label>
+
+            <button class="auth-submit-btn" @onclick="DoRegister" disabled="@Loading">
+                @(Loading ? "Creating account…" : "Create Account ✦")
+            </button>
+        </div>
+
+        <div class="auth-links">
+            <span>Already have an account?</span>
+            <a href="/login">Sign In</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    string FirstName       = "";
+    string LastName        = "";
+    string Email           = "";
+    string Password        = "";
+    string ConfirmPassword = "";
+    bool   AgreeTerms      = false;
+    string ErrorMsg        = "";
+    string SuccessMsg      = "";
+    bool   Loading         = false;
+    bool   ShowErr         = false;
+    bool   ShowPass        = false;
+
+    // Password strength
+    int    PasswordStrength => Password.Length switch
+    {
+        0     => 0,
+        < 8   => 1,
+        < 12  => Password.Any(char.IsUpper) && Password.Any(char.IsDigit) ? 3 : 2,
+        _     => Password.Any(char.IsUpper) && Password.Any(char.IsDigit)
+                 && Password.Any(char.IsPunctuation) ? 4 : 3
+    };
+    string StrengthLabel => PasswordStrength switch { 1 => "Weak", 2 => "Fair", 3 => "Good", 4 => "Strong", _ => "" };
+    string StrengthClass => PasswordStrength switch { 1 => "weak", 2 => "fair", 3 => "good", 4 => "strong", _ => "" };
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsLoggedIn) Nav.NavigateTo("/");
+    }
+
+    async Task DoRegister()
+    {
+        ShowErr  = false;
+        ErrorMsg = "";
+
+        if (string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(LastName)
+            || string.IsNullOrWhiteSpace(Email) || Password.Length < 8)
+        { ShowErr = true; ErrorMsg = "Please fill in all required fields."; return; }
+
+        if (Password != ConfirmPassword)
+        { ShowErr = true; ErrorMsg = "Passwords do not match."; return; }
+
+        if (!AgreeTerms)
+        { ErrorMsg = "Please accept the Terms & Conditions to continue."; return; }
+
+        Loading = true;
+        try
+        {
+            var result = await Api.RegisterAsync(
+                new RegisterRequest(FirstName, LastName, Email, Password, ConfirmPassword));
+
+            if (result?.Success == true && result.Token != null)
+            {
+                await Auth.SetTokenAsync(JS, result.Token);
+                Nav.NavigateTo("/");
+            }
+            else ErrorMsg = result?.Message ?? "Registration failed. Please try again.";
+        }
+        catch { ErrorMsg = "Unable to connect. Please try again."; }
+        finally { Loading = false; }
+    }
+}

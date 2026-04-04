@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>IzaleSparkle.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\IzaleSparkle.Application\IzaleSparkle.Application.csproj" />
+    <ProjectReference Include="..\IzaleSparkle.Domain\IzaleSparkle.Domain.csproj" />
+    <!-- EF Core + SQLite -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore"        Version="10.0.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools"  Version="10.0.*" PrivateAssets="all" />
+    <!-- Caching -->
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory"  Version="10.0.*" />
+    <!-- Configuration (for IConfiguration in JwtAuthService / DbSeeder) -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.*" />
+    <!-- PDF invoice generation -->
+    <PackageReference Include="QuestPDF" Version="2024.*" />
+    <!-- HttpClient factory (needed by MetaWhatsAppService) -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.*" />
+    <!-- Email (MailKit / MimeKit) -->
+    <PackageReference Include="MailKit"  Version="4.*" />
+    <PackageReference Include="MimeKit" Version="4.*" />
+    <!-- Password hashing -->
+    <PackageReference Include="BCrypt.Net-Next"                      Version="4.*" />
+    <!-- JWT token generation -->
+    <PackageReference Include="Microsoft.IdentityModel.Tokens"       Version="8.*" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt"      Version="8.*" />
+  </ItemGroup>
+</Project>

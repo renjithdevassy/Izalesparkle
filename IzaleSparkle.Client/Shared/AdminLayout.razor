@@ -1,0 +1,149 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject AuthService Auth
+@inject IJSRuntime JS
+@implements IDisposable
+
+@if (!Auth.IsAdmin)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <!-- ── MOBILE HEADER (phones only) ── -->
+    <div class="admin-mobile-header">
+        <div class="admin-mobile-logo">✦ Admin</div>
+        <button class="admin-mobile-hamburger" @onclick="ToggleMobileMenu"
+                aria-label="Menu">
+            @(MobileMenuOpen ? "✕" : "☰")
+        </button>
+    </div>
+
+    <!-- ── SIDEBAR OVERLAY (mobile) ── -->
+    @if (MobileMenuOpen)
+    {
+        <div class="admin-mobile-overlay" @onclick="CloseMobileMenu"></div>
+    }
+
+<div class="admin-wrap">
+    <aside class="admin-sidebar @(MobileMenuOpen ? "mobile-open" : "")">
+        <div class="admin-logo">
+            <a href="/" @onclick="CloseMobileMenu">Izale <span>✦</span> Sparkle</a>
+            <div class="admin-badge">Admin Panel</div>
+        </div>
+        <nav class="admin-nav">
+            <a href="/admin"            class="admin-nav-item @ActiveClass("/admin", exact: true)"  @onclick="CloseMobileMenu">
+                <span class="anav-icon">📊</span> Dashboard
+            </a>
+            <a href="/admin/products"   class="admin-nav-item @ActiveClass("/admin/products")"      @onclick="CloseMobileMenu">
+                <span class="anav-icon">💎</span> Products
+            </a>
+            <a href="/admin/stock"      class="admin-nav-item @ActiveClass("/admin/stock")"         @onclick="CloseMobileMenu">
+                <span class="anav-icon">📦</span> Stock
+            </a>
+            <a href="/admin/discounts"  class="admin-nav-item @ActiveClass("/admin/discounts")"     @onclick="CloseMobileMenu">
+                <span class="anav-icon">🏷️</span> Discounts
+            </a>
+            <a href="/admin/orders"     class="admin-nav-item @ActiveClass("/admin/orders")"        @onclick="CloseMobileMenu">
+                <span class="anav-icon">🛒</span> Orders
+            </a>
+            <a href="/admin/categories" class="admin-nav-item @ActiveClass("/admin/categories")"    @onclick="CloseMobileMenu">
+                <span class="anav-icon">🗂️</span> Categories
+            </a>
+            <a href="/admin/users"      class="admin-nav-item @ActiveClass("/admin/users")"         @onclick="CloseMobileMenu">
+                <span class="anav-icon">👥</span> Users
+            </a>
+            <div class="admin-nav-divider"></div>
+            <a href="/" class="admin-nav-item" @onclick="CloseMobileMenu">
+                <span class="anav-icon">🌐</span> View Site
+            </a>
+            <button class="admin-nav-item admin-logout-btn" @onclick="Logout">
+                <span class="anav-icon">🚪</span> Sign Out
+            </button>
+        </nav>
+        <div class="admin-sidebar-user">
+            <div class="admin-sidebar-avatar">@(Auth.FirstName?.FirstOrDefault().ToString() ?? "A")</div>
+            <div class="admin-sidebar-info">
+                <div class="admin-sidebar-name">@Auth.FullName</div>
+                <div class="admin-sidebar-role">Administrator</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="admin-main">
+        <header class="admin-header">
+            <div class="admin-header-title">@PageTitle</div>
+            <div class="admin-header-actions">
+                <span class="admin-user">✦ @Auth.Email</span>
+            </div>
+        </header>
+        <div class="admin-content admin-content-with-header">@Body</div>
+    </div>
+</div>
+}
+
+@code {
+    bool MobileMenuOpen = false;
+
+    void ToggleMobileMenu() => MobileMenuOpen = !MobileMenuOpen;
+    void CloseMobileMenu()  => MobileMenuOpen = false;
+
+    string PageTitle => Nav.Uri.ToLower() switch
+    {
+        var u when u.Contains("/admin/products/new")  => "New Product",
+        var u when u.Contains("/admin/products/edit") => "Edit Product",
+        var u when u.Contains("/admin/products")      => "Products",
+        var u when u.Contains("/admin/orders/edit")   => "Order Detail",
+        var u when u.Contains("/admin/orders")        => "Orders",
+        var u when u.Contains("/admin/categories")    => "Categories",
+        var u when u.Contains("/admin/stock")         => "Stock Control",
+        var u when u.Contains("/admin/discounts")     => "Discount Codes",
+        var u when u.Contains("/admin/users")         => "Users",
+        _                                             => "Dashboard",
+    };
+
+    protected override void OnInitialized()
+    {
+        Auth.OnAuthChanged += StateHasChanged;
+        Nav.LocationChanged += OnLocationChanged;
+        GuardRoute();
+    }
+
+    void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        MobileMenuOpen = false;
+        GuardRoute();
+        StateHasChanged();
+    }
+
+    protected override void OnParametersSet() => GuardRoute();
+
+    void GuardRoute()
+    {
+        if (!Auth.IsAdmin)
+        {
+            var returnUrl = Uri.EscapeDataString(new Uri(Nav.Uri).PathAndQuery);
+            Nav.NavigateTo($"/admin/login?returnUrl={returnUrl}", replace: true);
+        }
+    }
+
+    async Task Logout()
+    {
+        await Auth.LogoutAsync(JS);
+        Nav.NavigateTo("/admin/login", replace: true);
+    }
+
+    string ActiveClass(string path, bool exact = false)
+    {
+        var current = new Uri(Nav.Uri).AbsolutePath.ToLower();
+        return exact
+            ? (current == path.ToLower() ? "active" : "")
+            : (current.StartsWith(path.ToLower()) ? "active" : "");
+    }
+
+    public void Dispose()
+    {
+        Auth.OnAuthChanged -= StateHasChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

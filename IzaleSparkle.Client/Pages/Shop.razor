@@ -1,0 +1,200 @@
+@page "/shop"
+@inject IApiClient Api
+@inject ProductService FallbackSvc
+@inject NavigationManager Nav
+
+<PageTitle>Shop — Izale Sparkle</PageTitle>
+
+<div class="page-hero" style="min-height:35vh">
+    <span class="page-hero-tag">✦ Shop ✦</span>
+    <h1 class="page-hero-title">Fine <em>Jewellery</em></h1>
+    <p class="page-hero-sub">Every piece made to make you sparkle.</p>
+</div>
+
+<!-- Mobile chip filter bar -->
+<div class="shop-filter-bar">
+    @foreach (var cat in Categories)
+    {
+        <button class="filter-chip @(Category == cat.Key ? "active" : "")"
+                @onclick="() => SetCategory(cat.Key)">@cat.Label</button>
+    }
+</div>
+
+<!-- Toolbar -->
+<div class="shop-toolbar">
+    <div class="shop-count"><strong>@FilteredProducts.Count</strong> piece@(FilteredProducts.Count == 1 ? "" : "s")</div>
+    <div class="shop-toolbar-right">
+        <div class="view-toggle">
+            <button class="view-btn @(GridView ? "active" : "")"  @onclick="SetGridView"  aria-label="Grid">⊞</button>
+            <button class="view-btn @(!GridView ? "active" : "")" @onclick="SetListView"  aria-label="List">☰</button>
+        </div>
+        <button class="sort-btn" @onclick="ToggleSortSheet">Sort ↕</button>
+    </div>
+</div>
+
+@if (SortSheetOpen)
+{
+    <div class="sort-overlay" @onclick="ToggleSortSheet"></div>
+    <div class="sort-sheet">
+        <div class="sort-sheet-handle"></div>
+        <div class="sort-sheet-title">Sort By</div>
+        @foreach (var opt in SortOptions)
+        {
+            <button class="sort-option @(Sort == opt.Value ? "active" : "")" @onclick="() => SetSort(opt.Value)">
+                @opt.Label @if (Sort == opt.Value) {<span class="sort-check">✓</span>}
+            </button>
+        }
+    </div>
+}
+
+<div class="shop-layout">
+    <!-- Desktop sidebar -->
+    <aside class="shop-sidebar">
+        <div class="sb-section">
+            <div class="sb-title">Category</div>
+            @foreach (var cat in Categories)
+            {
+                <div class="filter-item @(Category == cat.Key ? "active" : "")"
+                     @onclick="() => SetCategory(cat.Key)">
+                    @cat.Label <span>@cat.Count</span>
+                </div>
+            }
+        </div>
+        <div class="sb-section">
+            <div class="sb-title">Sort By</div>
+            <select class="sb-select" @bind="Sort" @bind:after="ApplyFilters">
+                @foreach (var opt in SortOptions)
+                { <option value="@opt.Value">@opt.Label</option> }
+            </select>
+        </div>
+        <div class="sb-section">
+            <div class="sb-title">Max Price</div>
+            <input type="range" class="price-slider" min="500" max="10000" step="100"
+                   @bind="MaxPrice" @bind:event="oninput" @bind:after="ApplyFilters" />
+            <div class="price-labels"><span>£500</span><span>£@MaxPrice.ToString("N0")</span></div>
+        </div>
+        <div class="sb-section">
+            <div class="sb-title">Search</div>
+            <input class="sb-search" type="search" inputmode="search" placeholder="Search pieces…"
+                   @bind="SearchQuery" @bind:event="oninput" @bind:after="ApplyFilters" />
+        </div>
+    </aside>
+
+    <div class="shop-products">
+        @if (Loading)
+        {
+            <div class="loading-screen" style="min-height:300px">
+                <div class="loading-spinner">✦</div>
+            </div>
+        }
+        else if (!FilteredProducts.Any())
+        {
+            <div class="no-results">
+                <div style="font-size:2.5rem;margin-bottom:1rem;color:var(--gold)">✦</div>
+                <p>No pieces match your filters.</p>
+                <button class="btn btn-outline" @onclick="ClearFilters" style="margin-top:1.5rem">Clear Filters</button>
+            </div>
+        }
+        else
+        {
+            <div class="product-grid @(GridView ? "grid-3" : "list-view")">
+                @foreach (var (product, idx) in FilteredProducts.Select((p, i) => (p, i)))
+                {
+                    <ProductCard Summary="@product" DelayMs="@(idx * 50)" />
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Cat { get; set; }
+
+    bool Loading = true;
+    List<ProductSummaryResponse> FilteredProducts = new();
+    List<ProductSummaryResponse> AllProducts = new();
+    string Category    = "all";
+    string Sort        = "default";
+    decimal MaxPrice   = 10000;
+    string SearchQuery = "";
+    bool GridView      = true;
+    bool SortSheetOpen = false;
+
+    record CatItem(string Key, string Label, string Count);
+    record SortItem(string Value, string Label);
+
+    List<CatItem> Categories = new()
+    {
+        new("all", "All", "")
+    };
+
+    async Task LoadCategories()
+    {
+        try
+        {
+            var cats = await Api.GetAdminCategoriesAsync();
+            if (cats != null && cats.Any())
+            {
+                Categories = new List<CatItem> { new("all", "All", "") };
+                foreach (var c in cats.Where(x => x.IsActive).OrderBy(x => x.SortOrder))
+                    Categories.Add(new(c.Slug, c.Name, c.ProductCount.ToString()));
+            }
+        }
+        catch { /* keep defaults */ }
+    }
+
+    List<SortItem> SortOptions = new()
+    {
+        new("default",   "Featured"),
+        new("price-asc", "Price: Low to High"),
+        new("price-desc","Price: High to Low"),
+        new("rating",    "Top Rated"),
+        new("sale",      "On Sale"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Cat)) Category = Cat;
+        await LoadCategories();
+        await ApplyFilters();
+    }
+
+    async Task SetCategory(string cat) { Category = cat; await ApplyFilters(); }
+    async Task SetSort(string s)       { Sort = s; SortSheetOpen = false; await ApplyFilters(); }
+    void ToggleSortSheet()             => SortSheetOpen = !SortSheetOpen;
+    void SetGridView()                 => GridView = true;
+    void SetListView()                 => GridView = false;
+
+    async Task ApplyFilters()
+    {
+        Loading = true;
+        try
+        {
+            // ── API CALL ──────────────────────────────────────────
+            var req = new GetProductsRequest(
+                Category: Category == "all" ? null : Category,
+                Search:   SearchQuery,
+                MaxPrice: MaxPrice < 10000 ? MaxPrice : null,
+                Sort:     Sort,
+                PageSize: 100);
+            var result = await Api.GetProductsAsync(req);
+            FilteredProducts = result?.Items.ToList() ?? new();
+        }
+        catch
+        {
+            // Offline fallback
+            var local = FallbackSvc.Search(SearchQuery, Category == "all" ? null : Category, MaxPrice, Sort);
+            FilteredProducts = local.Select(p => new ProductSummaryResponse(
+                p.Id, p.Name, p.Name.ToLower().Replace(" ","-"), p.Material,
+                p.Price, p.OldPrice, p.Category, p.Badge, p.Stars, p.ImageUrl,
+                p.IsOnSale, p.SavePercent)).ToList();
+        }
+        finally { Loading = false; }
+    }
+
+    async Task ClearFilters()
+    {
+        Category = "all"; Sort = "default"; MaxPrice = 10000; SearchQuery = "";
+        await ApplyFilters();
+    }
+}

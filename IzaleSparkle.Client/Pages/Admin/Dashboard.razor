@@ -1,0 +1,137 @@
+@page "/admin"
+@layout AdminLayout
+@inject IApiClient Api
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Dashboard</h1>
+    <a href="/admin/products/new" class="btn btn-gold" style="font-size:.68rem">+ New Product</a>
+</div>
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else if (Data != null)
+{
+    <!-- STAT CARDS -->
+    <div class="admin-stats-grid">
+        <div class="admin-stat-card">
+            <div class="asc-icon">💎</div>
+            <div class="asc-num">@Data.TotalProducts</div>
+            <div class="asc-label">Total Products</div>
+            <div class="asc-sub">@Data.ActiveProducts active</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">📦</div>
+            <div class="asc-num">@Data.TotalOrders</div>
+            <div class="asc-label">Total Orders</div>
+            <div class="asc-sub">@Data.PendingOrders pending</div>
+        </div>
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">💷</div>
+            <div class="asc-num">£@Data.TotalRevenue.ToString("N0")</div>
+            <div class="asc-label">Total Revenue</div>
+            <div class="asc-sub">All time</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">🏷️</div>
+            <div class="asc-num">4</div>
+            <div class="asc-label">Categories</div>
+            <div class="asc-sub">Rings, Necklaces, Earrings, Bracelets</div>
+        </div>
+    </div>
+
+    <!-- RECENT PRODUCTS -->
+    <div class="admin-section">
+        <div class="admin-section-head">
+            <h2>Recent Products</h2>
+            <a href="/admin/products" class="admin-link">View all →</a>
+        </div>
+        <div class="admin-table-wrap">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Data.RecentProducts)
+                    {
+                        <tr>
+                            <td>
+                                <div class="admin-product-cell">
+                                    <img src="@p.ImageUrl" alt="@p.Name" class="admin-product-thumb" />
+                                    <div>
+                                        <div class="admin-product-name">@p.Name</div>
+                                        <div class="admin-product-material">@p.Material</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="admin-badge-chip">@p.Category</span></td>
+                            <td>
+                                <div class="admin-price">£@p.Price.ToString("N0")</div>
+                                @if (p.OldPrice.HasValue)
+                                {
+                                    <div class="admin-price-old">£@p.OldPrice.Value.ToString("N0")</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="admin-status @(p.IsActive ? "active" : "inactive")">
+                                    @(p.IsActive ? "Active" : "Inactive")
+                                </span>
+                            </td>
+                            <td>
+                                <a href="/admin/products/edit/@p.Id" class="admin-action-btn">Edit</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- RECENT ORDERS -->
+    @if (Data.RecentOrders.Any())
+    {
+        <div class="admin-section">
+            <div class="admin-section-head">
+                <h2>Recent Orders</h2>
+            </div>
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var o in Data.RecentOrders)
+                        {
+                            <tr>
+                                <td><span class="admin-order-num">@o.OrderNumber</span></td>
+                                <td>@o.CustomerEmail</td>
+                                <td>£@o.Total.ToString("N0")</td>
+                                <td><span class="order-status-chip @o.Status.ToLower()">@o.Status</span></td>
+                                <td>@o.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    bool Loading = true;
+    AdminDashboardResponse? Data;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try   { Data = await Api.GetDashboardAsync(); }
+        catch { }
+        finally { Loading = false; }
+    }
+}

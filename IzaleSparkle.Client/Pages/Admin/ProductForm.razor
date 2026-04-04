@@ -1,0 +1,716 @@
+@page "/admin/products/new"
+@page "/admin/products/edit/{Id:int}"
+@layout AdminLayout
+@inject IApiClient Api
+@inject NavigationManager Nav
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">@(IsEdit ? "Edit Product" : "New Product")</h1>
+    <a href="/admin/products" class="btn btn-outline" style="font-size:.68rem">← Back to Products</a>
+</div>
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <div class="admin-form-grid">
+
+        <!-- LEFT: Main details -->
+        <div class="admin-form-card">
+            <div class="admin-form-section-title">Product Details</div>
+
+            <div class="admin-field">
+                <label>Product Name *</label>
+                <input @bind="Name" placeholder="e.g. Diamond Solitaire Ring" class="@(ShowErr && string.IsNullOrWhiteSpace(Name) ? "field-error" : "")" />
+            </div>
+            <div class="admin-field">
+                <label>Description *</label>
+                <textarea @bind="Description" rows="4"
+                          placeholder="Detailed product description…"
+                          class="@(ShowErr && string.IsNullOrWhiteSpace(Description) ? "field-error" : "")"></textarea>
+            </div>
+            <div class="admin-field">
+                <label>Material / Composition *</label>
+                <input @bind="Material" placeholder="e.g. 18K White Gold & 1.2ct Diamond" />
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Price (£) *</label>
+                    <input type="number" @bind="Price" min="1" step="0.01"
+                           class="@(ShowErr && Price <= 0 ? "field-error" : "")" />
+                </div>
+                <div class="admin-field">
+                    <label>Original Price (£) <small>optional — shows crossed out</small></label>
+                    <input type="number" @bind="OldPrice" min="0" step="0.01" />
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>
+                    Cost / Purchase Price (£)
+                    <small>admin-only · never shown to customers</small>
+                </label>
+                <div style="display:flex;gap:.6rem;align-items:center">
+                    <input type="number" @bind="CostPrice" min="0" step="0.01"
+                           placeholder="0.00" style="flex:1" />
+                    @if (CostPrice.HasValue && CostPrice.Value > 0 && Price > 0)
+                    {
+                        var cost   = CostPrice.Value;
+                        var margin = (int)Math.Round((Price - cost) / Price * 100);
+                        var markup = (int)Math.Round((Price - cost) / cost * 100);
+                        var profit = Price - cost;
+                        <div class="cost-margin-badge @(margin >= 50 ? "good" : margin >= 25 ? "ok" : "low")">
+                            @margin% margin · £@profit.ToString("N2") profit · @markup% markup
+                        </div>
+                    }
+                </div>
+                <div class="admin-field-hint" style="margin-top:.3rem">
+                    🔒 Stored securely. Only visible in the admin panel.
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>VAT <small>UK standard rate 20%</small></label>
+                <div class="admin-toggle-row">
+                    <label class="admin-toggle">
+                        <input type="checkbox" @bind="IsVatApplicable" />
+                        <span class="admin-toggle-slider"></span>
+                    </label>
+                    <span>@(IsVatApplicable ? "VAT applicable (20%) — standard UK jewellery rate" : "VAT exempt — no VAT charged")</span>
+                </div>
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Category *</label>
+                    <select @bind="Category" class="@(ShowErr && string.IsNullOrWhiteSpace(Category) ? "field-error" : "")">
+                        <option value="">— Select —</option>
+                        <option value="rings">Rings</option>
+                        <option value="necklaces">Necklaces</option>
+                        <option value="earrings">Earrings</option>
+                    </select>
+                </div>
+                <div class="admin-field">
+                    <label>Badge <small>optional</small></label>
+                    <select @bind="Badge">
+                        <option value="">None</option>
+                        <option value="new">New</option>
+                        <option value="sale">Sale</option>
+                        <option value="bestseller">Bestseller</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>Star Rating (1–5)</label>
+                <div class="admin-stars-input">
+                    @for (int s = 1; s <= 5; s++)
+                    {
+                        var star = s;
+                        <button type="button"
+                                class="admin-star-btn @(Stars >= star ? "filled" : "")"
+                                @onclick="() => Stars = star">★</button>
+                    }
+                    <span class="admin-stars-label">@Stars / 5</span>
+                </div>
+            </div>
+
+            <!-- Stock & Supplier (admin-only) -->
+            <div class="admin-form-section-title" style="margin-top:1.5rem">Stock & Supplier</div>
+
+            @if (IsEdit && StockInfo != null)
+            {
+                <!-- Live stock status bar -->
+                <div class="stock-status-bar @(StockInfo.OutOfStock ? "out" : StockInfo.LowStock ? "low" : "ok")">
+                    <span class="stock-status-icon">
+                        @(StockInfo.OutOfStock ? "❌" : StockInfo.LowStock ? "⚠️" : "✅")
+                    </span>
+                    <div>
+                        <strong>@StockInfo.StockLevel units</strong> in stock
+                        @if (StockInfo.LowStock)  { <span> · Low stock — reorder soon</span> }
+                        @if (StockInfo.OutOfStock){ <span> · Out of stock</span> }
+                    </div>
+                    <a href="/admin/stock" class="stock-manage-link">Manage Stock →</a>
+                </div>
+
+                @if (StockInfo.RecentPurchases.Any())
+                {
+                    <div class="stock-purchase-history">
+                        <div style="font-size:.58rem;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:.6rem">
+                            Recent Purchases
+                        </div>
+                        @foreach (var pu in StockInfo.RecentPurchases.Take(3))
+                        {
+                            <div class="stock-purchase-row">
+                                <span class="spr-qty">×@pu.Quantity</span>
+                                <span class="spr-cost">£@pu.UnitCost.ToString("N2") each</span>
+                                <span class="spr-total">£@pu.TotalCost.ToString("N2") total</span>
+                                <span class="spr-date">@pu.PurchasedOn.ToString("dd MMM yy")</span>
+                                @if (!string.IsNullOrEmpty(pu.Supplier))
+                                {
+                                    <span class="spr-supplier">@pu.Supplier</span>
+                                }
+                            </div>
+                        }
+                        <div style="font-size:.62rem;color:var(--warm-gray);margin-top:.4rem">
+                            @StockInfo.TotalPurchased units purchased in total
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Current Stock Level</label>
+                    <input type="number" @bind="StockLevelVal" min="0" step="1" placeholder="0" />
+                    <div class="admin-field-hint">
+                        @if (IsEdit) { <text>Use the <a href="/admin/stock">Stock page</a> to record purchases.</text> }
+                        else { <text>Starting stock quantity (can be 0).</text> }
+                    </div>
+                </div>
+                <div class="admin-field">
+                    <label>Reorder Point <small>alert threshold</small></label>
+                    <input type="number" @bind="ReorderPoint" min="0" step="1" />
+                    <div class="admin-field-hint">Alert when stock reaches this level.</div>
+                </div>
+            </div>
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Supplier</label>
+                    <input @bind="Supplier" placeholder="Supplier name" />
+                </div>
+                <div class="admin-field">
+                    <label>Supplier SKU</label>
+                    <input @bind="SupplierSku" placeholder="SKU / Ref" />
+                </div>
+            </div>
+            <div class="admin-field">
+                <label>Lead Time (days) <small>days to restock from supplier</small></label>
+                <input type="number" @bind="LeadTimeDays" min="1" step="1" style="max-width:140px" />
+            </div>
+
+            @if (IsEdit)
+            {
+                <div class="admin-field">
+                    <label>Status</label>
+                    <div class="admin-toggle-row">
+                        <label class="admin-toggle">
+                            <input type="checkbox" @bind="IsActive" />
+                            <span class="admin-toggle-slider"></span>
+                        </label>
+                        <span>@(IsActive ? "Active — visible on store" : "Inactive — hidden from store")</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- RIGHT: Images -->
+        <div class="admin-form-card">
+            <div class="admin-form-section-title">Product Images</div>
+
+            <!-- ── UPLOAD TABS ── -->
+            <div class="img-tab-bar">
+                <button type="button" class="img-tab @(UploadTab == "upload" ? "active" : "")"
+                        @onclick='() => UploadTab = "upload"'>📁 Upload File</button>
+                <button type="button" class="img-tab @(UploadTab == "camera" ? "active" : "")"
+                        @onclick='() => UploadTab = "camera"'>📷 Camera</button>
+                <button type="button" class="img-tab @(UploadTab == "url" ? "active" : "")"
+                        @onclick='() => UploadTab = "url"'>🔗 URL</button>
+            </div>
+
+            <!-- ── UPLOAD FILE / DRAG-DROP ── -->
+            @if (UploadTab == "upload")
+            {
+                <div class="img-dropzone @(DragOver ? "drag-over" : "")"
+                     @ondragover:preventDefault @ondragover="() => DragOver = true"
+                     @ondragleave="() => DragOver = false"
+                     @ondrop:preventDefault @ondrop="OnDrop">
+                    <div class="img-dropzone-icon">🖼️</div>
+                    <div class="img-dropzone-text">
+                        Drag & drop images here<br />
+                        <small>JPG, PNG, WebP — max 10 MB each</small>
+                    </div>
+                    <label class="img-browse-btn">
+                        Browse Files
+                        <InputFile OnChange="OnFilesSelected" multiple accept="image/*"
+                                   style="display:none" />
+                    </label>
+                </div>
+            }
+
+            <!-- ── CAMERA CAPTURE (mobile) ── -->
+            @if (UploadTab == "camera")
+            {
+                <div class="img-camera-wrap">
+                    <p class="admin-field-hint">Opens your device camera or photo library.</p>
+                    <label class="img-camera-btn">
+                        📷 Take Photo / Choose from Library
+                        <InputFile OnChange="OnFilesSelected" accept="image/*"
+                                   capture="environment" style="display:none" />
+                    </label>
+                    <p class="admin-field-hint" style="margin-top:.5rem">
+                        On desktop this opens a file picker. On mobile it gives you camera + gallery options.
+                    </p>
+                </div>
+            }
+
+            <!-- ── URL INPUT ── -->
+            @if (UploadTab == "url")
+            {
+                <div class="admin-field">
+                    <label>Paste Image URL</label>
+                    <div class="admin-img-row" style="display:flex;gap:.5rem">
+                        <input @bind="UrlInput" @bind:event="oninput"
+                               placeholder="https://example.com/image.jpg"
+                               style="flex:1" />
+                        <button type="button" class="btn btn-dark"
+                                style="font-size:.62rem;padding:.6rem 1rem;white-space:nowrap"
+                                @onclick="AddFromUrl">Add</button>
+                    </div>
+                </div>
+
+                <!-- Unsplash quick-picks -->
+                <div class="admin-form-section-title" style="margin-top:1rem">Unsplash Quick-Fill</div>
+                <div class="admin-img-suggestions">
+                    @foreach (var s in UnsplashSuggestions)
+                    {
+                        <button type="button" class="admin-suggestion-img"
+                                @onclick="() => UseImage(s.Url)" title="@s.Label">
+                            <img src="@s.Url&w=80&q=60" alt="@s.Label" />
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- ── UPLOAD PROGRESS ── -->
+            @if (Uploading)
+            {
+                <div class="img-upload-progress">
+                    <div class="img-progress-bar">
+                        <div class="img-progress-fill" style="width:@(UploadProgress)%"></div>
+                    </div>
+                    <span class="img-progress-label">Uploading @UploadingName…</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(UploadError))
+            {
+                <div class="admin-error-banner" style="margin-top:.8rem">⚠️ @UploadError</div>
+            }
+
+            <!-- ── IMAGE GALLERY (all uploaded/set images) ── -->
+            @if (!string.IsNullOrWhiteSpace(ImageUrl) || AllImages.Any())
+            {
+                <div class="admin-form-section-title" style="margin-top:1.5rem">
+                    Images (@(AllImages.Count + (string.IsNullOrWhiteSpace(ImageUrl) ? 0 : 1)))
+                    <small style="font-size:.6rem;text-transform:none;letter-spacing:0;color:var(--warm-gray)">
+                        — first is the main image
+                    </small>
+                </div>
+                <div class="img-gallery-grid">
+                    @if (!string.IsNullOrWhiteSpace(ImageUrl))
+                    {
+                        <div class="img-gallery-item main">
+                            <img src="@ImageUrl" alt="Main" />
+                            <div class="img-gallery-badge">Main</div>
+                            <button type="button" class="img-gallery-remove"
+                                    @onclick="RemoveMainImage">✕</button>
+                        </div>
+                    }
+                    @foreach (var (url, i) in AllImages.Select((u, i) => (u, i)))
+                    {
+                        var idx = i;
+                        <div class="img-gallery-item">
+                            <img src="@url" alt="Image @(idx + 2)" />
+                            <button type="button" class="img-gallery-remove"
+                                    @onclick="() => RemoveGalleryImage(idx)">✕</button>
+                            <button type="button" class="img-gallery-make-main"
+                                    @onclick="() => MakeMainImage(idx)"
+                                    title="Set as main image">★</button>
+                        </div>
+                    }
+                </div>
+                <p class="admin-field-hint">Click ★ to set as main · ✕ to remove · Drag to reorder</p>
+            }
+            @if (ShowErr && string.IsNullOrWhiteSpace(ImageUrl))
+            {
+                <div style="color:#c0392b;font-size:.72rem;margin-top:.5rem">⚠️ At least one image is required.</div>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(ErrorMsg))
+    {
+        <div class="admin-error-banner">⚠️ @ErrorMsg</div>
+    }
+    @if (!string.IsNullOrEmpty(SuccessMsg))
+    {
+        <div class="admin-success-banner">✓ @SuccessMsg</div>
+    }
+
+    <!-- ── ATTRIBUTES (Future Feature) ── -->
+    <div class="admin-form-card" style="margin-top:1.5rem;opacity:.75">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+            <div class="admin-form-section-title" style="margin-bottom:0">
+                Product Attributes
+                <span style="background:#f3f4f6;color:#6b7280;font-size:.55rem;letter-spacing:.1em;padding:.15rem .5rem;border-radius:12px;margin-left:.5rem;font-weight:600;text-transform:uppercase">
+                    Future Feature
+                </span>
+            </div>
+            <label class="admin-toggle" title="Enable attributes (not yet available on storefront)">
+                <input type="checkbox" @bind="AttributesEnabled" />
+                <span class="admin-toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="admin-info-banner" style="margin-bottom:1rem">
+            🔮 Attributes allow you to define optional product variants (e.g. Stone colour, Chain length, Engraving).
+            These are stored but <strong>not displayed on the storefront</strong> until the feature is activated.
+            We currently don't do colour variants — this is here for future use.
+        </div>
+
+        @if (AttributesEnabled)
+        {
+            <div style="display:flex;flex-direction:column;gap:.8rem">
+                @for (int i = 0; i < Attributes.Count; i++)
+                {
+                    var idx = i;
+                    <div class="admin-field-row" style="align-items:center">
+                        <div class="admin-field" style="margin-bottom:0">
+                            <input @bind="Attributes[idx].Name" placeholder="Attribute name (e.g. Stone)" />
+                        </div>
+                        <div class="admin-field" style="margin-bottom:0">
+                            <input @bind="Attributes[idx].Value" placeholder="Value (e.g. Sapphire)" />
+                        </div>
+                        <button type="button" class="admin-remove-btn" style="flex-shrink:0"
+                                @onclick="() => Attributes.RemoveAt(idx)">✕</button>
+                    </div>
+                }
+                <button type="button" class="admin-add-img-btn" style="margin-top:.3rem"
+                        @onclick="AddAttribute">+ Add Attribute</button>
+            </div>
+            <div style="font-size:.62rem;color:var(--warm-gray);margin-top:.8rem">
+                📋 Saved to the database with <code>IsEnabled = false</code> — not shown on the storefront until the Attributes feature is released.
+            </div>
+        }
+        else
+        {
+            <div style="font-size:.72rem;color:var(--warm-gray);text-align:center;padding:.5rem">
+                Toggle the switch above to define future attributes for this product.
+            </div>
+        }
+    </div>
+
+    <div class="admin-form-actions">
+        <a href="/admin/products" class="btn btn-outline">Cancel</a>
+        <button class="btn btn-gold" @onclick="Save" disabled="@Saving">
+            @(Saving ? "Saving…" : (IsEdit ? "Update Product" : "Create Product"))
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    bool IsEdit    => Id > 0;
+    bool Loading   = true;
+    bool Saving    = false;
+    bool ShowErr   = false;
+    string ErrorMsg   = "";
+    string SuccessMsg = "";
+
+    // Form fields
+    string  Name        = "";
+    string  Description = "";
+    string  Material    = "";
+    decimal Price       = 0;
+    decimal? OldPrice   = null;
+    string  Category    = "";
+    string  Badge       = "";
+    int     Stars       = 5;
+    decimal? CostPrice      = null;
+    List<CategoryResponse> FormCategories = new();
+    bool     IsVatApplicable = true;  // admin-only — VAT flag
+    int      StockLevelVal = 0;
+    int      ReorderPoint  = 2;
+    int      LeadTimeDays  = 14;
+    string   Supplier      = string.Empty;
+    string   SupplierSku   = string.Empty;
+    string  ImageUrl    = "";       // main image
+    bool    IsActive    = true;
+    List<string> AllImages = new(); // gallery images (excludes main)
+
+    // Stock info (loaded when editing)
+    StockLevelResponse? StockInfo;
+
+    // Attributes (future feature)
+    bool AttributesEnabled = false;
+    record AttributeItem(string Name = "", string Value = "")
+    {
+        public string Name  { get; set; } = Name;
+        public string Value { get; set; } = Value;
+    }
+    List<AttributeItem> Attributes = new();
+    void AddAttribute() { if (Attributes.Count < 10) Attributes.Add(new AttributeItem()); }
+
+    // Upload state
+    string UploadTab     = "upload";
+    bool   Uploading     = false;
+    bool   DragOver      = false;
+    int    UploadProgress = 0;
+    string UploadingName = "";
+    string UploadError   = "";
+    string UrlInput      = "";
+
+    record ImgSuggestion(string Label, string Url);
+    List<ImgSuggestion> UnsplashSuggestions = new()
+    {
+        new("Ring 1",     "https://images.unsplash.com/photo-1605100804763-247f67b3557e"),
+        new("Ring 2",     "https://images.unsplash.com/photo-1573408301185-9519f94bf22b"),
+        new("Ring 3",     "https://images.unsplash.com/photo-1602173574767-37ac01994b2a"),
+        new("Necklace 1", "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f"),
+        new("Necklace 2", "https://images.unsplash.com/photo-1506630448388-4e683c67ddb0"),
+        new("Earring 1",  "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908"),
+        new("Earring 2",  "https://images.unsplash.com/photo-1589207212797-cfd578532af8"),
+        new("Bracelet 1", "https://images.unsplash.com/photo-1611085583191-a3b181a88401"),
+        new("Bracelet 2", "https://images.unsplash.com/photo-1611591437281-460bfbe1220a"),
+        new("Jewellery",  "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0"),
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEdit)
+        {
+            try
+            {
+                var products = await Api.GetAdminProductsAsync();
+                var p = products?.FirstOrDefault(x => x.Id == Id);
+                if (p != null)
+                {
+                    Name        = p.Name;
+                    Description = p.Description;
+                    Material    = p.Material;
+                    Price       = p.Price;
+                    OldPrice    = p.OldPrice;
+                    Category    = p.Category;
+                    Badge       = p.Badge ?? "";
+                    Stars       = p.Stars;
+                    ImageUrl    = p.ImageUrl;
+                    CostPrice     = p.CostPrice;
+                    StockLevelVal = p.StockLevel;
+                    ReorderPoint  = p.ReorderPoint;
+                    LeadTimeDays  = p.LeadTimeDays;
+                    Supplier      = p.Supplier ?? string.Empty;
+                    SupplierSku   = p.SupplierSku ?? string.Empty;
+                    IsActive      = p.IsActive;
+                    // All images from API — first is main, rest are gallery
+                    var imgs = p.Images.Where(u => !string.IsNullOrWhiteSpace(u)).ToList();
+                    if (imgs.Any()) ImageUrl = imgs[0];
+                    AllImages = imgs.Skip(1).ToList();
+                }
+            }
+            catch { ErrorMsg = "Failed to load product."; }
+
+            // Load live stock info separately
+            try
+            {
+                var report = await Api.GetStockReportAsync();
+                StockInfo = report?.Products.FirstOrDefault(p => p.ProductId == Id);
+            }
+            catch { /* non-critical */ }
+        }
+        // Load categories for dropdown
+        try { FormCategories = (await Api.GetAdminCategoriesAsync())?.Where(c => c.IsActive).ToList() ?? new(); }
+        catch { }
+        Loading = false;
+    }
+
+    // ── UPLOAD HANDLERS ──────────────────────────────────────────
+
+    async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        UploadError = "";
+        var files = e.GetMultipleFiles(maximumFileCount: 6);
+        await UploadFiles(files);
+    }
+
+    async Task OnDrop(DragEventArgs e)
+    {
+        DragOver    = false;
+        UploadError = "";
+        // Note: Blazor WASM drag-drop file access requires JS interop for actual file data.
+        // The InputFile component handles this automatically on click — for drag-drop we
+        // show a helpful message pointing users to the file picker if direct drop isn't supported.
+        UploadError = "Drag-drop not fully supported in all browsers. Please use the Browse Files button.";
+        await Task.CompletedTask;
+    }
+
+    async Task UploadFiles(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            if (file.Size > 10 * 1024 * 1024)
+            { UploadError = $"{file.Name} exceeds 10 MB limit."; continue; }
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp", "image/gif" };
+            if (!allowedTypes.Contains(file.ContentType))
+            { UploadError = $"{file.Name} is not a supported image type."; continue; }
+
+            Uploading     = true;
+            UploadingName = file.Name;
+            UploadProgress = 10;
+            StateHasChanged();
+
+            try
+            {
+                await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                UploadProgress = 40;
+                StateHasChanged();
+
+                var result = await Api.UploadImageAsync(stream, file.Name, file.ContentType);
+                UploadProgress = 100;
+
+                if (result?.Url != null)
+                {
+                    if (string.IsNullOrWhiteSpace(ImageUrl))
+                        ImageUrl = result.Url;
+                    else if (AllImages.Count < 5)
+                        AllImages.Add(result.Url);
+                    else
+                        UploadError = "Maximum 6 images reached.";
+                }
+                else UploadError = "Upload failed — please try again.";
+            }
+            catch (Exception ex) { UploadError = $"Upload error: {ex.Message}"; }
+            finally
+            {
+                Uploading      = false;
+                UploadProgress = 0;
+                UploadingName  = "";
+                StateHasChanged();
+            }
+        }
+    }
+
+    void AddFromUrl()
+    {
+        if (string.IsNullOrWhiteSpace(UrlInput)) return;
+        var url = UrlInput.Trim();
+        if (string.IsNullOrWhiteSpace(ImageUrl)) ImageUrl = url;
+        else if (AllImages.Count < 5) AllImages.Add(url);
+        UrlInput = "";
+    }
+
+    void UseImage(string url)
+    {
+        var full = $"{url}?w=600&q=80";
+        if (string.IsNullOrWhiteSpace(ImageUrl)) { ImageUrl = full; return; }
+        if (AllImages.Count < 5) AllImages.Add($"{url}?w=900&q=90");
+    }
+
+    void RemoveMainImage()
+    {
+        if (AllImages.Any())
+        {
+            ImageUrl = AllImages[0];
+            AllImages.RemoveAt(0);
+        }
+        else ImageUrl = "";
+    }
+
+    void RemoveGalleryImage(int idx)
+    {
+        if (idx >= 0 && idx < AllImages.Count)
+            AllImages.RemoveAt(idx);
+    }
+
+    void MakeMainImage(int idx)
+    {
+        if (idx < 0 || idx >= AllImages.Count) return;
+        var newMain = AllImages[idx];
+        AllImages.RemoveAt(idx);
+        if (!string.IsNullOrWhiteSpace(ImageUrl))
+            AllImages.Insert(0, ImageUrl);
+        ImageUrl = newMain;
+    }
+
+    // ── SAVE ─────────────────────────────────────────────────────
+
+    async Task Save()
+    {
+        ShowErr    = false;
+        ErrorMsg   = "";
+        SuccessMsg = "";
+
+        if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(Description)
+            || string.IsNullOrWhiteSpace(Category) || string.IsNullOrWhiteSpace(ImageUrl)
+            || Price <= 0)
+        {
+            ShowErr  = true;
+            ErrorMsg = "Please fill in all required fields (including at least one image).";
+            return;
+        }
+
+        Saving = true;
+        // Build full image list: main first, then gallery
+        var allImgList = new List<string> { ImageUrl }
+            .Concat(AllImages.Where(x => !string.IsNullOrWhiteSpace(x)))
+            .Distinct().Take(6).ToList();
+
+        try
+        {
+            if (IsEdit)
+            {
+                var req = new UpdateProductRequest(
+                    Id, Name, Description, Material, Price,
+                    OldPrice > 0 ? OldPrice : null,
+                    Category, string.IsNullOrEmpty(Badge) ? null : Badge,
+                    Stars, ImageUrl, allImgList, IsActive,
+                    CostPrice > 0 ? CostPrice : null,
+                    IsVatApplicable);
+                var result = await Api.UpdateProductAsync(Id, req);
+                if (result?.Success == true)
+                {
+                    // Update stock settings
+                    await Api.UpdateStockSettingsAsync(Id,
+                        new UpdateProductStockSettingsRequest(Id, ReorderPoint, LeadTimeDays,
+                            string.IsNullOrWhiteSpace(Supplier) ? null : Supplier,
+                            string.IsNullOrWhiteSpace(SupplierSku) ? null : SupplierSku));
+                    SuccessMsg = "Product updated successfully!";
+                }
+                else ErrorMsg = result?.Message ?? "Update failed.";
+            }
+            else
+            {
+                var req = new CreateProductRequest(
+                    Name, Description, Material, Price,
+                    OldPrice > 0 ? OldPrice : null,
+                    Category, string.IsNullOrEmpty(Badge) ? null : Badge,
+                    Stars, ImageUrl, allImgList,
+                    CostPrice > 0 ? CostPrice : null,
+                    IsVatApplicable);
+                var result = await Api.CreateProductAsync(req);
+                if (result?.Success == true)
+                {
+                    // Set initial stock level and settings
+                    if (result.Data != null)
+                    {
+                        if (StockLevelVal > 0)
+                            await Api.AdjustStockAsync(result.Data.Id, StockLevelVal, "Initial stock");
+                        await Api.UpdateStockSettingsAsync(result.Data.Id,
+                            new UpdateProductStockSettingsRequest(result.Data.Id, ReorderPoint, LeadTimeDays,
+                                string.IsNullOrWhiteSpace(Supplier) ? null : Supplier,
+                                string.IsNullOrWhiteSpace(SupplierSku) ? null : SupplierSku));
+                    }
+                    Nav.NavigateTo("/admin/products");
+                }
+                else ErrorMsg = result?.Message ?? "Creation failed.";
+            }
+        }
+        catch (Exception ex) { ErrorMsg = $"Error: {ex.Message}"; }
+        finally { Saving = false; }
+    }
+}

@@ -1,0 +1,324 @@
+@page "/checkout"
+@inject CartService Cart
+@inject NavigationManager Nav
+@inject IApiClient Api
+
+<PageTitle>Checkout — Izale Sparkle</PageTitle>
+
+@if (OrderPlaced)
+{
+    <div class="success-screen">
+        <div class="success-ring"><span>✦</span></div>
+        <h2 class="success-title">Order Confirmed!</h2>
+        <p class="success-sub">Your sparkle is on its way. Check your email for confirmation.</p>
+        <p class="success-order">Order @OrderNumber</p>
+        <a href="/" class="btn btn-dark" style="margin-top:2rem">Continue Shopping ✦</a>
+    </div>
+}
+else
+{
+    <nav class="checkout-nav">
+        <a href="/"><span class="checkout-logo">Izale ✦ Sparkle</span></a>
+        <div class="checkout-steps">
+            <span class="cstep done">✓ Cart</span>
+            <span class="step-line"></span>
+            <span class="cstep active">1 Details</span>
+            <span class="step-line"></span>
+            <span class="cstep">2 Shipping</span>
+        </div>
+        <span class="secure-badge">🔒 SSL Secured</span>
+    </nav>
+
+    <div class="checkout-layout">
+        <!-- FORM -->
+        <div class="checkout-form-col">
+
+            <!-- CONTACT -->
+            <div class="co-section">
+                <h3 class="co-section-title">Contact Information</h3>
+                <p class="co-section-sub">Your sparkle confirmation will be sent here</p>
+                <div class="f-row">
+                    <div class="f-field"><label>First Name</label><input type="text" @bind="FirstName" placeholder="Alexandra" /></div>
+                    <div class="f-field"><label>Last Name</label><input type="text" @bind="LastName" placeholder="Hartwell" /></div>
+                </div>
+                <div class="f-row full"><div class="f-field"><label>Email</label><input type="email" @bind="Email" placeholder="you@example.com" /></div></div>
+                <div class="f-row full"><div class="f-field"><label>Phone</label><input type="tel" @bind="Phone" placeholder="+44 7700 900000" /></div></div>
+                <label class="chk-wrap"><input type="checkbox" @bind="MarketingOpt" /><span>Receive exclusive Izale Sparkle offers</span></label>
+            </div>
+
+            <hr class="form-divider" />
+
+            <!-- ADDRESS -->
+            <div class="co-section">
+                <h3 class="co-section-title">Delivery Address</h3>
+                <div class="f-row full"><div class="f-field"><label>Address Line 1</label><input type="text" @bind="Address1" placeholder="House number and street name" /></div></div>
+                <div class="f-row full"><div class="f-field"><label>Address Line 2 (optional)</label><input type="text" @bind="Address2" placeholder="Apartment, suite, unit…" /></div></div>
+                <div class="f-row">
+                    <div class="f-field"><label>City</label><input type="text" @bind="City" placeholder="London" /></div>
+                    <div class="f-field"><label>Postcode</label><input type="text" @bind="Postcode" placeholder="W1A 1AA" /></div>
+                </div>
+                <div class="f-row full"><div class="f-field"><label>Country</label>
+                    <select @bind="Country">
+                        <option>United Kingdom</option><option>United States</option><option>France</option><option>Germany</option><option>Italy</option><option>UAE</option>
+                    </select>
+                </div></div>
+            </div>
+
+            <hr class="form-divider" />
+
+            <!-- SHIPPING -->
+            <div class="co-section">
+                <h3 class="co-section-title">Shipping Method</h3>
+                @foreach (var s in ShippingOptions)
+                {
+                    <div class="radio-opt @(SelectedShipping == s.Name ? "sel" : "")" @onclick="() => { SelectedShipping = s.Name; Cart.SetShipping(s.Cost); }">
+                        <div class="r-dot @(SelectedShipping == s.Name ? "checked" : "")"></div>
+                        <div class="r-main"><div class="r-title">@s.Name</div><div class="r-sub">@s.Desc</div></div>
+                        <span class="r-price">@(s.Cost == 0 ? "Free" : "£" + s.Cost)</span>
+                    </div>
+                }
+            </div>
+
+            <hr class="form-divider" />
+
+            <!-- PAYMENT NOTICE -->
+            <div class="co-section">
+                <h3 class="co-section-title">Payment</h3>
+                <div class="payment-notice">
+                    <div class="payment-notice-icon">💷</div>
+                    <div>
+                        <div class="payment-notice-title">Payment on Arrangement</div>
+                        <div class="payment-notice-body">
+                            We will contact you after your order to arrange payment.
+                            We accept bank transfer, cash on collection, and other methods agreed directly with us.
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="form-divider" />
+
+                <div class="f-row full"><div class="f-field"><label>Gift Message / Engraving (optional)</label><input type="text" @bind="GiftMessage" placeholder="e.g. 'Where every look sparkles ✦'" /></div></div>
+
+                <div class="chk-wrap @(TermsAccepted ? "chk-checked" : "")"
+                     style="margin-bottom:2rem;cursor:pointer"
+                     @onclick="() => TermsAccepted = !TermsAccepted">
+                    <div class="chk-box @(TermsAccepted ? "chk-box-checked" : "")">
+                        @if (TermsAccepted) { <span style="color:white;font-size:.7rem;line-height:1">✓</span> }
+                    </div>
+                    <span>I agree to Izale Sparkle's Terms &amp; Conditions and Privacy Policy. I confirm I am over 18.</span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(FormError))
+                {
+                    <div class="form-error">@FormError</div>
+                }
+
+                <button class="submit-btn" @onclick="PlaceOrder">
+                    Complete Purchase · £@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N2")) ✦
+                </button>
+                <p class="form-note">🔒 SSL Secured · All orders fully insured · Free 30-day returns ✦</p>
+            </div>
+        </div>
+
+        <!-- ORDER SUMMARY -->
+        <div class="checkout-summary-col">
+
+            <!-- Mobile: collapsible toggle -->
+            <div class="checkout-summary-toggle @(SummaryOpen ? "open" : "")"
+                 @onclick="() => SummaryOpen = !SummaryOpen">
+                <span>Order Summary · £@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N0"))</span>
+                <span class="toggle-chevron">▼</span>
+            </div>
+
+            <div class="checkout-summary-collapsible @(SummaryOpen ? "open" : "")">
+
+            <div class="cos-title">✦ Your Sparkle Order ✦</div>
+
+            @if (Cart.IsEmpty)
+            {
+                <p style="color:rgba(245,240,225,0.3);font-style:italic;text-align:center;padding:2rem 0">Cart is empty</p>
+            }
+            else
+            {
+                @foreach (var item in Cart.Items)
+                {
+                    <div class="cos-item">
+                        <div class="cos-item-img-wrap">
+                            <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cos-item-img" />
+                            <div class="cos-img-overlay"></div>
+                            @if (!string.IsNullOrEmpty(item.Product.Badge))
+                            {
+                                <div class="cos-item-badge">@(item.Product.Badge == "new" ? "New In" : item.Product.Badge == "sale" ? "Sale" : "")</div>
+                            }
+                            <div class="cos-item-qty-badge">×@item.Quantity</div>
+                        </div>
+                        <div class="cos-item-row">
+                            <div>
+                                <div class="cos-item-name">@item.Product.Name</div>
+                                <div class="cos-item-meta">@item.SelectedMetal</div>
+                            </div>
+                            <div class="cos-item-price">£@item.LineTotal.ToString("N0")</div>
+                        </div>
+                        <div class="cos-item-ctrl">
+                            <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity - 1)">−</button>
+                            <span class="q-num">@item.Quantity</span>
+                            <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity + 1)">+</button>
+                            <button class="cos-remove" @onclick="() => Cart.RemoveItem(item.Product.Id)">Remove</button>
+                        </div>
+                    </div>
+                }
+            }
+
+            <div class="promo-wrap">
+                <div class="promo-row">
+                    <input class="promo-input" type="text" placeholder="Promotional code e.g. SPARKLE10"
+                           @bind="PromoCode" @bind:event="oninput"
+                           @onkeydown="@(async e => { if (e.Key == "Enter") await ApplyPromo(); })" />
+                    <button class="promo-apply" @onclick="ApplyPromo">Apply</button>
+                </div>
+                @if (!string.IsNullOrEmpty(PromoMessage))
+                {
+                    <div class="promo-msg @(PromoApplied ? "promo-ok" : "promo-err")">@PromoMessage</div>
+                }
+            </div>
+
+            <div class="cos-totals">
+                <div class="tot-row"><span>Subtotal</span><span>£@Cart.Subtotal.ToString("N0")</span></div>
+                @if (PromoApplied)
+                {
+                    <div class="tot-row discount"><span>Discount @(string.IsNullOrEmpty(PromoCode) ? "" : $"({PromoCode.ToUpper()})")</span><span>−£@DiscountAmt.ToString("N2")</span></div>
+                }
+                <div class="tot-row"><span>Shipping</span><span>@(Cart.Shipping == 0 ? "Free" : "£" + Cart.Shipping)</span></div>
+                @if (Cart.Vat > 0)
+                {
+                    <div class="tot-row"><span>VAT (20% on applicable items)</span><span>£@Cart.Vat.ToString("N2")</span></div>
+                }
+                <div class="tot-grand">
+                    <span>Total</span>
+                    <span>£@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N2"))</span>
+                </div>
+            </div>
+
+            <div class="trust-badges">
+                <div class="trust-b"><span>🛡️</span>Secure</div>
+                <div class="trust-b"><span>✦</span>Certified</div>
+                <div class="trust-b"><span>🔁</span>Returns</div>
+                <div class="trust-b"><span>🚚</span>Insured</div>
+            </div>
+
+            </div><!-- end collapsible -->
+        </div>
+    </div>
+}
+
+@code {
+    // Form fields
+    string FirstName = "", LastName = "", Email = "", Phone = "";
+    string Address1 = "", Address2 = "", City = "", Postcode = "", Country = "United Kingdom";
+    string GiftMessage = "";
+    bool MarketingOpt = false, TermsAccepted = false;
+    string SelectedShipping = "Standard Delivery";
+    string PromoCode = "", PromoMessage = "";
+    bool PromoApplied = false;
+    decimal DiscountAmt = 0;
+    bool OrderPlaced = false;
+    string FormError = "";
+    string OrderNumber = "";
+    bool SummaryOpen = false; // mobile collapsible — closed by default
+
+    record ShippingOption(string Name, string Desc, decimal Cost);
+    record PaymentMethod(string Name, string Desc, string Icon);
+
+    List<ShippingOption> ShippingOptions = new()
+    {
+        new("Standard Delivery",  "3–5 business days · Tracked & Insured", 0),
+        new("Express Delivery",   "1–2 business days · White-glove packaging", 12),
+        new("Same Day Courier",   "London postcodes only · Signature required", 28),
+    };
+
+    List<PaymentMethod> PaymentMethods = new()
+    {
+        new("Credit / Debit Card", "Visa, Mastercard, Amex", "💳"),
+        new("PayPal",              "Secure one-click checkout",  "🅿"),
+        new("Apple Pay",           "Touch ID payment",           "🍎"),
+    };
+
+    async Task ApplyPromo()
+    {
+        PromoMessage = "";
+        if (string.IsNullOrWhiteSpace(PromoCode)) return;
+        try
+        {
+            var result = await Api.ValidateDiscountAsync(PromoCode.Trim(), Cart.Subtotal);
+            if (result?.Valid == true)
+            {
+                PromoApplied = true;
+                DiscountAmt  = result.DiscountAmount;
+                PromoMessage = $"✦ Code applied — {result.DiscountPercent}% off · You save £{result.DiscountAmount:N2}";
+            }
+            else
+            {
+                PromoApplied = false;
+                DiscountAmt  = 0;
+                PromoMessage = $"✕ {result?.Message ?? "Invalid promotional code"}";
+            }
+        }
+        catch { PromoMessage = "✕ Could not validate code. Please try again."; }
+    }
+
+    bool Submitting = false;
+
+    async Task PlaceOrder()
+    {
+        FormError = "";
+        if (string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(Email))
+        { FormError = "Please fill in your name and email."; return; }
+        if (string.IsNullOrWhiteSpace(Address1) || string.IsNullOrWhiteSpace(City) || string.IsNullOrWhiteSpace(Postcode))
+        { FormError = "Please fill in your delivery address."; return; }
+        if (!TermsAccepted)
+        { FormError = "Please accept the Terms & Conditions."; return; }
+        if (Cart.IsEmpty)
+        { FormError = "Your bag is empty."; return; }
+
+        Submitting = true;
+        try
+        {
+            // ── API CALL ──────────────────────────────────────────
+            var req = new IzaleSparkle.Contracts.Requests.PlaceOrderRequest(
+                Email:        Email,
+                FirstName:    FirstName,
+                LastName:     LastName,
+                AddressLine1: Address1,
+                AddressLine2: Address2,
+                City:         City,
+                Postcode:     Postcode,
+                Country:      Country,
+                PaymentMethod:"Arrangement",
+                ShippingTier: SelectedShipping,
+                PromoCode:    PromoApplied ? PromoCode : null,
+                GiftMessage:  GiftMessage,
+                Items:        Cart.Items.Select(i =>
+                    new IzaleSparkle.Contracts.Requests.OrderItemRequest(
+                        i.Product.Id, i.Quantity, i.SelectedMetal, i.SelectedSize))
+                    .ToList()
+            );
+
+            var result = await Api.PlaceOrderAsync(req);
+            if (result?.Success == true && result.Data != null)
+            {
+                OrderNumber = result.Data.OrderNumber;
+                OrderPlaced = true;
+                Cart.Clear();
+            }
+            else
+            {
+                FormError = result?.Message ?? "Order failed — please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            FormError = $"Could not place order: {ex.Message}. Please try again or contact us.";
+        }
+        finally { Submitting = false; }
+    }
+}

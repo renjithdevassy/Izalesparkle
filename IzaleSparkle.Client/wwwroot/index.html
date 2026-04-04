@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+
+    <!-- MOBILE FIRST VIEWPORT -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
+
+    <!-- SEO -->
+    <meta name="description" content="Izale Sparkle — Where Every Look Sparkles. Fine jewellery handcrafted with conflict-free gemstones and 18K gold." />
+    <meta name="keywords" content="fine jewellery, diamond rings, gold necklaces, luxury jewellery, engagement rings" />
+    <title>Izale Sparkle — Where Every Look Sparkles</title>
+    <base href="/" />
+
+    <!-- PWA MANIFEST -->
+    <link rel="manifest" href="manifest.webmanifest" />
+
+    <!-- THEME COLOUR (browser chrome on mobile) -->
+    <meta name="theme-color" content="#1C1A16" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#1C1A16" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Izale Sparkle" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+    <!-- OPEN GRAPH / SOCIAL -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content="Izale Sparkle — Where Every Look Sparkles" />
+    <meta property="og:description" content="Fine jewellery handcrafted with conflict-free gemstones and 18K gold." />
+    <meta property="og:image"       content="icons/icon-512.png" />
+
+    <!-- MOBILE: disable tap highlight, touch callout -->
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- FONTS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Raleway:wght@200;300;400;500;600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+
+    <!-- STYLES -->
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="IzaleSparkle.styles.css" />
+</head>
+<body>
+    <div id="app">
+        <!-- Splash shown while Blazor WASM boots -->
+        <div class="blazor-loading-screen">
+            <div class="loading-logo">Izale <span>✦</span> Sparkle</div>
+            <div class="loading-tagline">Where Every Look Sparkles</div>
+            <div class="loading-dots">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An error has occurred. <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <!-- BLAZOR WASM -->
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <!-- APP JS (cursor, scroll reveal, etc.) -->
+    <script src="js/app.js"></script>
+
+    <!-- SERVICE WORKER REGISTRATION -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js', { scope: '/' })
+                .then(reg => {
+                    console.log('[SW] Registered:', reg.scope);
+                    // Prompt user when update is available
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // Show update banner (handled in MainLayout)
+                                window.dispatchEvent(new CustomEvent('sw-update-available'));
+                            }
+                        });
+                    });
+                })
+                .catch(err => console.warn('[SW] Registration failed:', err));
+        }
+
+        // Install prompt — capture for use in app
+        window.deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            window.deferredInstallPrompt = e;
+            window.dispatchEvent(new CustomEvent('pwa-installable'));
+        });
+
+        window.addEventListener('appinstalled', () => {
+            window.deferredInstallPrompt = null;
+            console.log('[PWA] App installed');
+        });
+    </script>
+    <script>
+        window.downloadFileFromBytes = (base64, filename, mimeType) => {
+            const bytes = atob(base64);
+            const arr   = new Uint8Array(bytes.length);
+            for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+            const blob  = new Blob([arr], { type: mimeType });
+            const url   = URL.createObjectURL(blob);
+            const a     = document.createElement('a');
+            a.href      = url; a.download = filename; a.click();
+            URL.revokeObjectURL(url);
+        };
+    </script>
+</body>
+</html>
+

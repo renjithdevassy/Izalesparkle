@@ -1,0 +1,231 @@
+@page "/admin/categories"
+@layout AdminLayout
+@inject IApiClient Api
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">
+        Categories
+        @if (CategoryList.Any())
+        { <span class="admin-count-badge">@CategoryList.Count</span> }
+    </h1>
+    <button class="btn btn-gold" style="font-size:.68rem" @onclick="OpenCreate">+ New Category</button>
+</div>
+
+@if (!string.IsNullOrEmpty(SuccessMsg)) { <div class="admin-success-banner">✓ @SuccessMsg</div> }
+@if (!string.IsNullOrEmpty(ErrorMsg))   { <div class="admin-error-banner">⚠️ @ErrorMsg</div> }
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <div class="admin-stats-grid" style="margin-bottom:1.5rem">
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">🗂️</div>
+            <div class="asc-num">@CategoryList.Count</div>
+            <div class="asc-label">Categories</div>
+            <div class="asc-sub">@CategoryList.Count(c => c.IsActive) active</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">💎</div>
+            <div class="asc-num">@CategoryList.Sum(c => c.ProductCount)</div>
+            <div class="asc-label">Total Products</div>
+            <div class="asc-sub">Across all categories</div>
+        </div>
+    </div>
+
+    <div class="admin-cat-grid">
+        @foreach (var cat in CategoryList.OrderBy(c => c.SortOrder).ThenBy(c => c.Name))
+        {
+            <div class="admin-cat-card @(!cat.IsActive ? "cat-inactive" : "")">
+                <div class="admin-cat-icon">@cat.Icon</div>
+                <div class="admin-cat-name">@cat.Name</div>
+                <div class="admin-cat-desc">@cat.Description</div>
+                <div class="admin-cat-count">@cat.ProductCount product@(cat.ProductCount == 1 ? "" : "s")</div>
+                <div style="font-size:.6rem;letter-spacing:.14em;color:var(--gold);margin:.3rem 0;font-family:monospace">/@cat.Slug</div>
+                @if (!cat.IsActive)
+                { <div style="font-size:.62rem;color:#dc2626;margin-bottom:.4rem">● Hidden from store</div> }
+                <div class="admin-cat-actions">
+                    <a href="/admin/products?cat=@cat.Slug" class="admin-action-btn">Products</a>
+                    <button class="admin-action-btn" @onclick="() => OpenEdit(cat)">Edit</button>
+                    <button class="admin-action-btn danger" @onclick="() => OpenDelete(cat)">Delete</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (ShowForm)
+{
+    <div class="admin-modal-overlay" @onclick="CloseForm">
+        <div class="admin-modal" style="max-width:460px;text-align:left" @onclick:stopPropagation>
+            <h3 class="admin-modal-title" style="text-align:left;margin-bottom:1.5rem">
+                @(EditId == 0 ? "Create Category" : "Edit Category")
+            </h3>
+
+            <div class="admin-field-row" style="align-items:flex-end">
+                <div class="admin-field" style="flex:0 0 64px">
+                    <label>Icon</label>
+                    <input @bind="FormIcon" maxlength="4"
+                           style="font-size:1.6rem;text-align:center;padding:.4rem" />
+                </div>
+                <div class="admin-field" style="flex:1">
+                    <label>Category Name *</label>
+                    <input @bind="FormName" @bind:event="oninput" placeholder="e.g. Rings" />
+                    @if (!string.IsNullOrWhiteSpace(FormName))
+                    {
+                        <div style="font-size:.62rem;color:var(--warm-gray);margin-top:.25rem">
+                            Slug: <code>/@ToSlug(FormName)</code>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>Description</label>
+                <textarea @bind="FormDescription" rows="2"
+                          placeholder="Short description for the storefront…"></textarea>
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Sort Order <small>lower = first</small></label>
+                    <input type="number" @bind="FormSortOrder" min="0" step="1" style="max-width:100px" />
+                </div>
+                <div class="admin-field">
+                    <label>Status</label>
+                    <div class="admin-toggle-row" style="margin-top:.6rem">
+                        <label class="admin-toggle">
+                            <input type="checkbox" @bind="FormActive" />
+                            <span class="admin-toggle-slider"></span>
+                        </label>
+                        <span style="font-size:.74rem">@(FormActive ? "Active" : "Hidden")</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>Quick Icons</label>
+                <div style="display:flex;flex-wrap:wrap;gap:.4rem">
+                    @foreach (var emoji in QuickIcons)
+                    {
+                        <button type="button"
+                                style="font-size:1.4rem;padding:.3rem .5rem;border:1px solid @(FormIcon==emoji ? "var(--gold)":"var(--border)");background:@(FormIcon==emoji ? "rgba(200,151,58,.1)":"white");border-radius:4px;cursor:pointer"
+                                @onclick="() => FormIcon = emoji">@emoji</button>
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(FormError))
+            { <div class="admin-error-banner" style="margin-bottom:.5rem">⚠️ @FormError</div> }
+
+            <div class="admin-modal-actions" style="justify-content:flex-end;margin-top:1.2rem">
+                <button class="btn btn-outline" @onclick="CloseForm">Cancel</button>
+                <button class="btn btn-gold" @onclick="SaveCategory" disabled="@Saving">
+                    @(Saving ? "Saving…" : (EditId == 0 ? "Create ✦" : "Save Changes"))
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (DeleteCat != null)
+{
+    <div class="admin-modal-overlay" @onclick="() => DeleteCat = null">
+        <div class="admin-modal" @onclick:stopPropagation>
+            <div style="font-size:2.5rem;margin-bottom:.5rem">@DeleteCat.Icon</div>
+            <h3 class="admin-modal-title">Delete "@DeleteCat.Name"?</h3>
+            <p style="font-size:.82rem;color:var(--warm-gray);margin-bottom:1.5rem">
+                This removes the category. @DeleteCat.ProductCount product@(DeleteCat.ProductCount==1?"":"s") will not be deleted but will lose their category.
+            </p>
+            <div class="admin-modal-actions">
+                <button class="btn btn-outline" @onclick="() => DeleteCat = null">Cancel</button>
+                <button class="btn btn-dark" @onclick="ConfirmDelete" disabled="@Saving">
+                    @(Saving ? "Deleting…" : "Delete")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool Loading = true; bool Saving = false;
+    string SuccessMsg = ""; string ErrorMsg = "";
+    List<CategoryResponse> CategoryList = new();
+
+    bool     ShowForm = false; int EditId = 0;
+    string   FormName = ""; string FormDescription = ""; string FormIcon = "💎";
+    int      FormSortOrder = 0; bool FormActive = true; string FormError = "";
+    CategoryResponse? DeleteCat;
+
+    string[] QuickIcons = ["💍","📿","✨","💎","👑","🪙","🔮","❤️","🌟","⭐","🌸","🏆","🎀","💜","🪩"];
+    static string ToSlug(string n) => n.ToLower().Trim().Replace(" ","-").Replace("'","").Replace("&","and");
+
+    protected override async Task OnInitializedAsync() => await LoadCategories();
+
+    async Task LoadCategories()
+    {
+        Loading = true;
+        try   { CategoryList = (await Api.GetAdminCategoriesAsync())?.ToList() ?? new(); }
+        catch { ErrorMsg = "Failed to load categories."; }
+        finally { Loading = false; }
+    }
+
+    void OpenCreate()
+    {
+        EditId=0; FormName=""; FormDescription=""; FormIcon="💎";
+        FormSortOrder = CategoryList.Any() ? CategoryList.Max(c=>c.SortOrder)+1 : 0;
+        FormActive=true; FormError=""; ShowForm=true;
+    }
+
+    void OpenEdit(CategoryResponse c)
+    {
+        EditId=c.Id; FormName=c.Name; FormDescription=c.Description;
+        FormIcon=c.Icon; FormSortOrder=c.SortOrder; FormActive=c.IsActive; FormError="";
+        ShowForm=true;
+    }
+
+    void CloseForm() { ShowForm=false; FormError=""; }
+    void OpenDelete(CategoryResponse c) { DeleteCat=c; }
+
+    async Task SaveCategory()
+    {
+        FormError="";
+        if (string.IsNullOrWhiteSpace(FormName)) { FormError="Name is required."; return; }
+        Saving=true;
+        try
+        {
+            if (EditId==0)
+            {
+                var r = await Api.CreateCategoryAsync(
+                    new CreateCategoryRequest(FormName,FormDescription,FormIcon,FormSortOrder,FormActive));
+                if (r?.Success==true) { SuccessMsg=$"'{r.Data?.Name}' created."; ShowForm=false; await LoadCategories(); }
+                else FormError = r?.Message ?? "Failed.";
+            }
+            else
+            {
+                var r = await Api.UpdateCategoryAsync(EditId,
+                    new UpdateCategoryRequest(EditId,FormName,FormDescription,FormIcon,FormSortOrder,FormActive));
+                if (r?.Success==true) { SuccessMsg="Category updated."; ShowForm=false; await LoadCategories(); }
+                else FormError = r?.Message ?? "Failed.";
+            }
+        }
+        catch { FormError="An error occurred."; }
+        finally { Saving=false; }
+    }
+
+    async Task ConfirmDelete()
+    {
+        if (DeleteCat==null) return;
+        Saving=true;
+        try
+        {
+            if (await Api.DeleteCategoryAsync(DeleteCat.Id))
+            { SuccessMsg=$"'{DeleteCat.Name}' deleted."; DeleteCat=null; await LoadCategories(); }
+            else ErrorMsg="Failed to delete.";
+        }
+        catch { ErrorMsg="Delete error."; }
+        finally { Saving=false; }
+    }
+}

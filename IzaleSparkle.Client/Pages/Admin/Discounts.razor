@@ -1,0 +1,310 @@
+@page "/admin/discounts"
+@layout AdminLayout
+@inject IApiClient Api
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">
+        Discount Codes
+        @if (Codes.Any())
+        { <span class="admin-count-badge">@Codes.Count</span> }
+    </h1>
+    <button class="btn btn-gold" style="font-size:.68rem" @onclick="OpenCreate">
+        + New Code
+    </button>
+</div>
+
+@if (!string.IsNullOrEmpty(SuccessMsg))
+{ <div class="admin-success-banner">✓ @SuccessMsg</div> }
+@if (!string.IsNullOrEmpty(ErrorMsg))
+{ <div class="admin-error-banner">⚠️ @ErrorMsg</div> }
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else
+{
+    <!-- Stats -->
+    <div class="admin-stats-grid" style="margin-bottom:1.5rem">
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">🏷️</div>
+            <div class="asc-num">@Codes.Count</div>
+            <div class="asc-label">Total Codes</div>
+            <div class="asc-sub">@Codes.Count(c => c.IsActive) active</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">✅</div>
+            <div class="asc-num">@Codes.Count(c => c.IsValid)</div>
+            <div class="asc-label">Valid Now</div>
+            <div class="asc-sub">Usable by customers</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">📊</div>
+            <div class="asc-num">@Codes.Sum(c => c.TimesUsed)</div>
+            <div class="asc-label">Total Uses</div>
+            <div class="asc-sub">Across all codes</div>
+        </div>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Description</th>
+                    <th>Discount</th>
+                    <th>Usage</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Codes)
+                {
+                    <tr>
+                        <td>
+                            <div class="discount-code-chip">@c.Code</div>
+                        </td>
+                        <td style="font-size:.78rem;color:var(--warm-gray)">@c.Description</td>
+                        <td>
+                            <div class="cost-margin-badge good" style="font-size:.72rem">
+                                @c.DiscountPercent% OFF
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size:.78rem">@c.TimesUsed used</div>
+                            @if (c.MaxUses.HasValue)
+                            {
+                                <div style="font-size:.65rem;color:var(--warm-gray)">
+                                    of @c.MaxUses max
+                                </div>
+                                <div class="discount-usage-bar">
+                                    <div class="discount-usage-fill"
+                                         style="width:@(Math.Min(100, c.TimesUsed * 100 / c.MaxUses.Value))%"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="font-size:.65rem;color:var(--warm-gray)">unlimited</div>
+                            }
+                        </td>
+                        <td style="font-size:.72rem;color:var(--warm-gray)">
+                            @(c.ExpiresAt.HasValue ? c.ExpiresAt.Value.ToString("dd MMM yyyy") : "Never")
+                        </td>
+                        <td>
+                            @if (c.IsValid)
+                            {
+                                <span class="admin-status active">Active</span>
+                            }
+                            else if (!c.IsActive)
+                            {
+                                <span class="admin-status inactive">Disabled</span>
+                            }
+                            else if (c.ExpiresAt.HasValue && c.ExpiresAt < DateTime.UtcNow)
+                            {
+                                <span class="admin-status inactive">Expired</span>
+                            }
+                            else
+                            {
+                                <span class="admin-status inactive">Limit reached</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="admin-actions">
+                                <button class="admin-action-btn" @onclick="() => OpenEdit(c)">Edit</button>
+                                <button class="admin-action-btn danger" @onclick="() => OpenDelete(c)">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Codes.Any())
+                {
+                    <tr><td colspan="7" class="admin-empty">No discount codes yet. Create your first one above.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- ── CREATE / EDIT MODAL ── -->
+@if (ShowForm)
+{
+    <div class="admin-modal-overlay" @onclick="CloseForm">
+        <div class="admin-modal" style="max-width:480px;text-align:left;max-height:90vh;overflow-y:auto"
+             @onclick:stopPropagation>
+            <h3 class="admin-modal-title" style="text-align:left;margin-bottom:1.5rem">
+                @(EditId == 0 ? "Create Discount Code" : "Edit Discount Code")
+            </h3>
+
+            <div class="admin-field">
+                <label>Code * <small>customers enter this at checkout</small></label>
+                <input @bind="FormCode" placeholder="e.g. SUMMER20" style="text-transform:uppercase;font-family:monospace;letter-spacing:.1em" />
+                <div class="admin-field-hint">Will be stored in UPPERCASE automatically.</div>
+            </div>
+            <div class="admin-field">
+                <label>Description *</label>
+                <input @bind="FormDescription" placeholder="e.g. Summer sale 20% off" />
+            </div>
+            <div class="admin-field">
+                <label>Discount Percentage *</label>
+                <div style="display:flex;align-items:center;gap:.8rem">
+                    <input type="number" @bind="FormPercent" min="1" max="100" step="1"
+                           style="max-width:120px" />
+                    <span style="font-size:1.1rem;color:var(--gold)">% OFF</span>
+                    @if (FormPercent > 0)
+                    {
+                        <span class="cost-margin-badge good" style="font-size:.68rem">
+                            Saves @FormPercent% on every order
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Max Uses <small>optional — blank = unlimited</small></label>
+                    <input type="number" @bind="FormMaxUses" min="1" placeholder="Unlimited" />
+                </div>
+                <div class="admin-field">
+                    <label>Expires On <small>optional</small></label>
+                    <input type="date" @bind="FormExpires" />
+                </div>
+            </div>
+            <div class="admin-field">
+                <label>Status</label>
+                <div class="admin-toggle-row">
+                    <label class="admin-toggle">
+                        <input type="checkbox" @bind="FormActive" />
+                        <span class="admin-toggle-slider"></span>
+                    </label>
+                    <span>@(FormActive ? "Active — customers can use this code" : "Inactive — code is disabled")</span>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(FormError))
+            { <div class="admin-error-banner">⚠️ @FormError</div> }
+
+            <div class="admin-modal-actions" style="justify-content:flex-end;margin-top:1.5rem">
+                <button class="btn btn-outline" @onclick="CloseForm">Cancel</button>
+                <button class="btn btn-gold" @onclick="SaveCode" disabled="@Saving">
+                    @(Saving ? "Saving…" : (EditId == 0 ? "Create Code ✦" : "Save Changes"))
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── DELETE CONFIRM ── -->
+@if (DeleteCode != null)
+{
+    <div class="admin-modal-overlay" @onclick="() => DeleteCode = null">
+        <div class="admin-modal" @onclick:stopPropagation>
+            <div style="font-size:2rem;margin-bottom:1rem">🗑️</div>
+            <h3 class="admin-modal-title">Delete <span style="color:var(--gold)">@DeleteCode.Code</span>?</h3>
+            <p style="font-size:.82rem;color:var(--warm-gray);margin-bottom:1.5rem">
+                This cannot be undone. Past orders that used this code will not be affected.
+            </p>
+            <div class="admin-modal-actions">
+                <button class="btn btn-outline" @onclick="() => DeleteCode = null">Cancel</button>
+                <button class="btn btn-dark" @onclick="ConfirmDelete" disabled="@Saving">
+                    @(Saving ? "Deleting…" : "Delete Code")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    bool   Loading = true;
+    bool   Saving  = false;
+    string SuccessMsg = "";
+    string ErrorMsg   = "";
+
+    List<DiscountCodeResponse> Codes = new();
+
+    // Form state
+    bool     ShowForm       = false;
+    int      EditId         = 0;
+    string   FormCode       = "";
+    string   FormDescription= "";
+    decimal  FormPercent    = 10;
+    int?     FormMaxUses    = null;
+    DateTime? FormExpires   = null;
+    bool     FormActive     = true;
+    string   FormError      = "";
+
+    DiscountCodeResponse? DeleteCode;
+
+    protected override async Task OnInitializedAsync() => await LoadCodes();
+
+    async Task LoadCodes()
+    {
+        Loading = true;
+        try { Codes = (await Api.GetDiscountCodesAsync())?.ToList() ?? new(); }
+        catch { ErrorMsg = "Failed to load discount codes."; }
+        finally { Loading = false; }
+    }
+
+    void OpenCreate()
+    {
+        EditId = 0; FormCode = ""; FormDescription = ""; FormPercent = 10;
+        FormMaxUses = null; FormExpires = null; FormActive = true; FormError = "";
+        ShowForm = true;
+    }
+
+    void OpenEdit(DiscountCodeResponse c)
+    {
+        EditId = c.Id; FormCode = c.Code; FormDescription = c.Description;
+        FormPercent = c.DiscountPercent; FormMaxUses = c.MaxUses;
+        FormExpires = c.ExpiresAt; FormActive = c.IsActive; FormError = "";
+        ShowForm = true;
+    }
+
+    void OpenDelete(DiscountCodeResponse c) { DeleteCode = c; }
+    void CloseForm() { ShowForm = false; FormError = ""; }
+
+    async Task SaveCode()
+    {
+        FormError = "";
+        if (string.IsNullOrWhiteSpace(FormCode)) { FormError = "Code is required."; return; }
+        if (string.IsNullOrWhiteSpace(FormDescription)) { FormError = "Description is required."; return; }
+        if (FormPercent <= 0 || FormPercent > 100) { FormError = "Discount must be between 1 and 100%."; return; }
+
+        Saving = true;
+        try
+        {
+            if (EditId == 0)
+            {
+                var req = new CreateDiscountCodeRequest(FormCode, FormDescription,
+                    FormPercent, FormActive, FormMaxUses, FormExpires);
+                var result = await Api.CreateDiscountCodeAsync(req);
+                if (result?.Success == true) { SuccessMsg = $"Code {result.Data?.Code} created."; ShowForm = false; await LoadCodes(); }
+                else FormError = result?.Message ?? "Failed to create code.";
+            }
+            else
+            {
+                var req = new UpdateDiscountCodeRequest(EditId, FormCode, FormDescription,
+                    FormPercent, FormActive, FormMaxUses, FormExpires);
+                var result = await Api.UpdateDiscountCodeAsync(EditId, req);
+                if (result?.Success == true) { SuccessMsg = "Code updated."; ShowForm = false; await LoadCodes(); }
+                else FormError = result?.Message ?? "Failed to update code.";
+            }
+        }
+        catch { FormError = "An error occurred."; }
+        finally { Saving = false; }
+    }
+
+    async Task ConfirmDelete()
+    {
+        if (DeleteCode == null) return;
+        Saving = true;
+        try
+        {
+            var ok = await Api.DeleteDiscountCodeAsync(DeleteCode.Id);
+            if (ok) { SuccessMsg = $"Code {DeleteCode.Code} deleted."; DeleteCode = null; await LoadCodes(); }
+            else ErrorMsg = "Failed to delete.";
+        }
+        catch { ErrorMsg = "Delete error."; }
+        finally { Saving = false; }
+    }
+}

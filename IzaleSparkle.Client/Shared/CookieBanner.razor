@@ -1,0 +1,182 @@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (ShowBanner)
+{
+    <div class="cookie-overlay @(ShowDetails ? "cookie-overlay-dim" : "")" aria-live="polite">
+        <div class="cookie-banner @(ShowDetails ? "cookie-banner-expanded" : "")">
+
+            @if (!ShowDetails)
+            {
+                <!-- ── SIMPLE VIEW ── -->
+                <div class="cookie-simple">
+                    <div class="cookie-icon">🍪</div>
+                    <div class="cookie-text">
+                        <div class="cookie-title">We use cookies</div>
+                        <div class="cookie-body">
+                            We use essential cookies to make our site work. We'd also like to set optional
+                            analytics cookies to help us improve it.
+                            <a href="#" class="cookie-link" @onclick="ShowDetailsPanel" @onclick:preventDefault>Manage preferences</a>
+                        </div>
+                    </div>
+                    <div class="cookie-actions">
+                        <button class="cookie-btn cookie-btn-outline" @onclick="RejectAll">Reject All</button>
+                        <button class="cookie-btn cookie-btn-gold" @onclick="AcceptAll">Accept All ✦</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- ── DETAILS VIEW ── -->
+                <div class="cookie-details">
+                    <div class="cookie-details-header">
+                        <div style="display:flex;align-items:center;gap:.8rem">
+                            <span style="font-size:1.4rem">🍪</span>
+                            <div class="cookie-title">Cookie Preferences</div>
+                        </div>
+                        <button class="cookie-close" @onclick="() => ShowDetails = false">✕</button>
+                    </div>
+
+                    <p class="cookie-intro">
+                        We use cookies to enhance your experience on the Izale Sparkle website.
+                        You can choose which categories of cookies you allow below.
+                        Essential cookies are always active as the site cannot function without them.
+                    </p>
+
+                    <!-- Essential -->
+                    <div class="cookie-category">
+                        <div class="cookie-cat-header">
+                            <div>
+                                <div class="cookie-cat-title">Essential Cookies</div>
+                                <div class="cookie-cat-desc">Required for the website to function — shopping bag, login, security. Cannot be disabled.</div>
+                            </div>
+                            <div class="cookie-toggle-wrap">
+                                <div class="cookie-toggle-always">Always On</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analytics -->
+                    <div class="cookie-category">
+                        <div class="cookie-cat-header">
+                            <div>
+                                <div class="cookie-cat-title">Analytics Cookies</div>
+                                <div class="cookie-cat-desc">Help us understand how visitors interact with our site so we can improve it. All data is anonymised.</div>
+                            </div>
+                            <div class="cookie-toggle-wrap">
+                                <label class="cookie-toggle">
+                                    <input type="checkbox" @bind="AllowAnalytics" />
+                                    <span class="cookie-toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Marketing -->
+                    <div class="cookie-category">
+                        <div class="cookie-cat-header">
+                            <div>
+                                <div class="cookie-cat-title">Marketing Cookies</div>
+                                <div class="cookie-cat-desc">Used to show you relevant ads on other websites and measure the effectiveness of our campaigns.</div>
+                            </div>
+                            <div class="cookie-toggle-wrap">
+                                <label class="cookie-toggle">
+                                    <input type="checkbox" @bind="AllowMarketing" />
+                                    <span class="cookie-toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cookie-details-actions">
+                        <button class="cookie-btn cookie-btn-outline" @onclick="RejectAll">Reject All Optional</button>
+                        <button class="cookie-btn cookie-btn-outline" @onclick="SavePreferences">Save Preferences</button>
+                        <button class="cookie-btn cookie-btn-gold" @onclick="AcceptAll">Accept All ✦</button>
+                    </div>
+
+                    <div class="cookie-legal">
+                        By using this site you agree to our
+                        <a href="/privacy" class="cookie-link">Privacy Policy</a> and
+                        <a href="/cookies" class="cookie-link">Cookie Policy</a>.
+                        Izale Sparkle · 24 Hatton Garden, London EC1N 8DB
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<!-- Re-open button (after consent given) -->
+@if (!ShowBanner && ConsentGiven)
+{
+    <button class="cookie-reopen-btn" @onclick="Reopen" title="Cookie preferences">🍪</button>
+}
+
+@code {
+    bool ShowBanner   = false;
+    bool ShowDetails  = false;
+    bool ConsentGiven = false;
+    bool AllowAnalytics = false;
+    bool AllowMarketing = false;
+
+    const string ConsentKey    = "izale_cookie_consent";
+    const string AnalyticsKey  = "izale_cookie_analytics";
+    const string MarketingKey  = "izale_cookie_marketing";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var consent = await JS.InvokeAsync<string?>("localStorage.getItem", ConsentKey);
+            if (string.IsNullOrEmpty(consent))
+            {
+                ShowBanner = true;
+                StateHasChanged();
+            }
+            else
+            {
+                ConsentGiven   = true;
+                AllowAnalytics = await JS.InvokeAsync<string?>("localStorage.getItem", AnalyticsKey) == "true";
+                AllowMarketing = await JS.InvokeAsync<string?>("localStorage.getItem", MarketingKey) == "true";
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    void ShowDetailsPanel() { ShowDetails = true; }
+    void Reopen()           { ShowBanner = true; ShowDetails = true; }
+
+    async Task AcceptAll()
+    {
+        AllowAnalytics = true;
+        AllowMarketing = true;
+        await Save("all");
+    }
+
+    async Task RejectAll()
+    {
+        AllowAnalytics = false;
+        AllowMarketing = false;
+        await Save("essential");
+    }
+
+    async Task SavePreferences() => await Save("custom");
+
+    async Task Save(string level)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", ConsentKey,   level);
+            await JS.InvokeVoidAsync("localStorage.setItem", AnalyticsKey, AllowAnalytics.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", MarketingKey, AllowMarketing.ToString().ToLower());
+        }
+        catch { }
+        ShowBanner   = false;
+        ShowDetails  = false;
+        ConsentGiven = true;
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}

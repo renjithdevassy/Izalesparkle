@@ -1,0 +1,473 @@
+@page "/product/{Id:int}"
+@inject IApiClient Api
+@inject ProductService FallbackSvc
+@inject CartService Cart
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>@(Product?.Name ?? "Product") — Izale Sparkle</PageTitle>
+
+@if (Product == null)
+{
+    <div class="loading-screen">
+        <div class="loading-spinner">✦</div>
+        <p>Loading your sparkle…</p>
+    </div>
+}
+else
+{
+    <!-- BREADCRUMB -->
+    <div class="breadcrumb">
+        <a href="/">Home</a> <span class="bsep">✦</span>
+        <a href="/shop">Shop</a> <span class="bsep">✦</span>
+        <a href="/shop?cat=@Product.Category">@System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Product.Category)</a> <span class="bsep">✦</span>
+        <span class="bcurrent">@Product.Name</span>
+    </div>
+
+    <div class="product-detail-layout">
+
+        <!-- ══ GALLERY ══ -->
+        <div class="gallery-col">
+            <div class="gallery-zoom-wrap" id="galleryZoomWrap">
+                <!-- Main image box — overflow:hidden clips image but NOT the zoom panel -->
+                <div class="main-img-box" id="mainImgBox"
+                     @onmouseenter="ZoomEnter"
+                     @onmouseleave="ZoomLeave"
+                     @onmousemove="ZoomMove">
+
+                    <div class="zoom-lens" id="zoomLens"
+                         style="display:@(ZoomActive?"block":"none");
+                                left:@(LensX)px;top:@(LensY)px;
+                                width:@(LensSize)px;height:@(LensSize)px"></div>
+
+                    <img id="mainProductImg" src="@CurrentImage" alt="@Product.Name"
+                         class="main-product-img" />
+
+                    @if (!string.IsNullOrEmpty(Product.Badge))
+                    {
+                        <div class="img-badge-wrap">
+                            <span class="img-badge badge-@(Product.Badge == "sale" ? "sale" : "new-in")">
+                                @(Product.Badge == "new" ? "New In" : Product.Badge == "sale" ? "Sale" : "Best Seller")
+                            </span>
+                        </div>
+                    }
+
+                    <button class="img-nav-btn prev-btn" @onclick="() => ChangeImage(-1)">‹</button>
+                    <button class="img-nav-btn next-btn" @onclick="() => ChangeImage(1)">›</button>
+
+                    @if (!ZoomActive)
+                    {
+                        <div class="zoom-hint">🔍 Hover to zoom</div>
+                        <div class="touch-swipe-hint">← Swipe to browse →</div>
+                    }
+
+                    <button class="fullscreen-btn" @onclick="() => LightboxOpen = true">⛶</button>
+                </div>
+
+                <!-- Zoom result — SIBLING of main-img-box, renders outside overflow:hidden -->
+                @if (ZoomActive)
+                {
+                    <div class="zoom-result-panel" id="zoomResultPanel"
+                         style="background-image:url('@CurrentImage');
+                                background-size:@(BoxW * ZoomFactor)px @(BoxH * ZoomFactor)px;
+                                background-position:-@(BgX)px -@(BgY)px;
+                                width:@(BoxW)px;height:@(BoxH)px"></div>
+                }
+            </div>
+
+            <!-- THUMBNAILS -->
+            <div class="thumb-strip">
+                @for (int i = 0; i < Product.Images.Count; i++)
+                {
+                    var idx = i;
+                    <div class="thumb @(CurrentIndex == idx ? "active" : "")"
+                         @onclick="() => SetImage(idx)">
+                        <img src="@Product.Images[idx]" alt="View @(idx+1)" loading="lazy" />
+                    </div>
+                }
+            </div>
+            <div class="img-counter">
+                Image <span>@(CurrentIndex+1)</span> of <span>@Product.Images.Count</span>
+            </div>
+        </div>
+
+        <!-- ══ INFO ══ -->
+        <div class="info-col">
+            <div class="product-brand-tag">✦ Izale Sparkle</div>
+            <h1 class="product-title">@Product.Name</h1>
+
+            <div class="rating-row">
+                <span class="stars-display">@Product.StarsDisplay</span>
+                <button class="rating-count" @onclick="ShowReviewsTab">@ReviewCount Reviews</button>
+@if (StockLevel > 0)
+                {
+                    <span class="in-stock-badge">✓ In Stock @(StockLevel <= 3 ? $"· Only {StockLevel} left" : "")</span>
+                }
+                else
+                {
+                    <span class="out-of-stock-badge">✕ Out of Stock</span>
+                }
+            </div>
+
+            <div class="price-block">
+                <span class="price-main">£@Product.Price.ToString("N0")</span>
+                @if (Product.IsOnSale && Product.OldPrice.HasValue)
+                {
+                    <span class="price-old">£@Product.OldPrice.Value.ToString("N0")</span>
+                    @if (Product.SavePercent.HasValue && Product.SavePercent > 0)
+                    {
+                        <span class="price-save">Save @Product.SavePercent%</span>
+                    }
+                }
+                <div class="price-vat">Inc. VAT · Free UK Delivery · Certificate Included</div>
+            </div>
+
+
+            <div class="info-divider"></div>
+
+            <!-- BUY ROW -->
+            <div class="buy-row">
+                <div class="qty-control">
+                    <button class="qty-btn" @onclick="() => Qty = Math.Max(1, Qty-1)">−</button>
+                    <span class="qty-display">@Qty</span>
+                    <button class="qty-btn" @onclick="() => { if (Qty < StockLevel) Qty++; }"
+                            disabled="@(Qty >= StockLevel)">+</button>
+                </div>
+                @if (StockLevel > 0 && Qty >= StockLevel && StockLevel <= 5)
+                {
+                    <div style="font-size:.68rem;color:#dc2626;margin-bottom:.5rem">
+                        ⚠️ Only @StockLevel item@(StockLevel == 1 ? "" : "s") in stock
+                    </div>
+                }
+                <button class="add-cart-btn @(AddedFeedback ? "added" : "") @(StockLevel <= 0 ? "btn-disabled" : "")" @onclick="AddToCart" disabled="@(StockLevel <= 0)">
+                    @(StockLevel <= 0 ? "Out of Stock" : AddedFeedback ? "✓ Added!" : "Add to Sparkle Bag ✦")
+                </button>
+                <button class="wish-btn @(IsWishlisted ? "wishlisted" : "")" @onclick="() => IsWishlisted = !IsWishlisted">
+                    @(IsWishlisted ? "♥" : "♡")
+                </button>
+            </div>
+
+            <button class="buy-now-btn" @onclick="BuyNow">Buy Now — Pay Securely ✦</button>
+
+            <div class="trust-pills">
+                <div class="trust-pill">🚚 Free UK Delivery</div>
+                <div class="trust-pill">🔁 30-Day Returns</div>
+                <div class="trust-pill">🛡️ Lifetime Guarantee</div>
+                <div class="trust-pill">✒️ Free Engraving</div>
+                <div class="trust-pill">📜 Certificate Included</div>
+            </div>
+
+            <div class="info-divider"></div>
+            <div class="share-row">
+                <span>Share</span>
+                <button class="share-btn">f</button>
+                <button class="share-btn">P</button>
+                <button class="share-btn">◎</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs-section">
+        <div class="tab-nav">
+            <button class="tab-btn @(ActiveTab=="description"?"active":"")" @onclick="ShowDescriptionTab">Description</button>
+            <button class="tab-btn @(ActiveTab=="details"?"active":"")" @onclick="ShowDetailsTab">Details &amp; Care</button>
+            <button class="tab-btn @(ActiveTab=="shipping"?"active":"")" @onclick="ShowShippingTab">Delivery &amp; Returns</button>
+            <button class="tab-btn @(ActiveTab=="reviews"?"active":"")" @onclick="ShowReviewsTab">Reviews (@ReviewCount)</button>
+        </div>
+
+        @if (ActiveTab == "description")
+        {
+            <div class="tab-panel">
+                <div class="desc-grid">
+                    <div class="desc-text">
+                        <p>The <strong>@Product.Name</strong> — @Product.Description</p>
+                        <p>Every Izale Sparkle piece is hallmarked and comes with a full certificate of authenticity, a gift box, and our lifetime craftsmanship guarantee. <strong>Free engraving</strong> available on request.</p>
+                    </div>
+                    <div class="spec-table">
+                        <div class="spec-row"><span>Material</span><span>@Product.Material</span></div>
+                        <div class="spec-row"><span>Category</span><span>@System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Product.Category)</span></div>
+                        <div class="spec-row"><span>Certification</span><span>GIA Certified</span></div>
+                        <div class="spec-row"><span>Hallmark</span><span>750 (18K)</span></div>
+                        <div class="spec-row"><span>Origin</span><span>Conflict-Free Certified</span></div>
+                        <div class="spec-row"><span>Delivery</span><span>Free UK · Tracked &amp; Insured</span></div>
+                        <div class="spec-row"><span>Guarantee</span><span>Lifetime Craftsmanship</span></div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (ActiveTab == "details")
+        {
+            <div class="tab-panel">
+                <div class="detail-item"><div class="di-icon">💎</div><div><h4>Gemstone Care</h4><p>Clean with warm water, mild soap and a soft brush. Store separately. Avoid harsh chemicals.</p></div></div>
+                <div class="detail-item"><div class="di-icon">✦</div><div><h4>Gold Care</h4><p>Remove before swimming or heavy work. Free annual professional polish included with every piece.</p></div></div>
+                <div class="detail-item"><div class="di-icon">✒️</div><div><h4>Free Engraving</h4><p>Up to 20 characters. Select at checkout or contact us. Allow 3 extra days.</p></div></div>
+                <div class="detail-item"><div class="di-icon">🛡️</div><div><h4>Lifetime Guarantee</h4><p>Covers manufacturing defects. Annual inspections and cleaning included for life.</p></div></div>
+            </div>
+        }
+
+        @if (ActiveTab == "shipping")
+        {
+            <div class="tab-panel">
+                <div class="detail-item"><div class="di-icon">🚚</div><div><h4>Standard Delivery — Free</h4><p>3–5 business days. Tracked, insured, signature required.</p></div></div>
+                <div class="detail-item"><div class="di-icon">⚡</div><div><h4>Express — £12</h4><p>1–2 business days. White-glove packaging and priority handling.</p></div></div>
+                <div class="detail-item"><div class="di-icon">🔁</div><div><h4>30-Day Returns</h4><p>Return unworn pieces within 30 days for a full refund.</p></div></div>
+            </div>
+        }
+
+        @if (ActiveTab == "reviews")
+        {
+            <div class="tab-panel">
+                <div class="reviews-summary">
+                    <div class="review-score"><div class="big-num">4.9</div><div class="big-stars">★★★★★</div><div>@ReviewCount reviews</div></div>
+                    <div class="review-bars">
+                        @foreach (var (stars, pct) in new[] { (5,"87%"),(4,"10%"),(3,"2%"),(2,"1%"),(1,"0%") })
+                        {
+                            <div class="bar-row"><span>@stars ★</span><div class="bar-track"><div class="bar-fill" style="width:@pct"></div></div><span>@pct</span></div>
+                        }
+                    </div>
+                </div>
+                @foreach (var review in Reviews)
+                {
+                    <div class="review-card">
+                        <div class="review-top">
+                            <div><div class="reviewer">@review.AuthorName</div><div class="review-date">@review.Date</div></div>
+                            <div style="text-align:right">
+                                <div class="review-stars">@(new string('★', review.Stars))@(new string('☆', 5-review.Stars))</div>
+                                @if (review.Verified) { <span class="verified-badge">✓ Verified</span> }
+                            </div>
+                        </div>
+                        <div class="review-title">@review.Title</div>
+                        <div class="review-body">@review.Body</div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- RELATED -->
+    <div class="related-section">
+        <div class="section-head">
+            <span class="section-tag">✦ You May Also Love ✦</span>
+            <h2 class="section-title">Complete Your <em>Sparkle</em></h2>
+            <div class="sparkle-divider"><span>✦</span></div>
+        </div>
+        <div class="product-grid grid-4">
+            @foreach (var (p, i) in Related.Select((x, i) => (x, i)))
+            {
+                <ProductCard Product="@p" DelayMs="@(i * 100)" />
+            }
+        </div>
+    </div>
+
+    <!-- LIGHTBOX -->
+    @if (LightboxOpen)
+    {
+        <div class="lightbox open">
+            <button class="lb-close" @onclick="() => LightboxOpen = false">✕</button>
+            <button class="lb-nav lb-prev" @onclick="() => LbIdx = (LbIdx - 1 + Product.Images.Count) % Product.Images.Count">‹</button>
+            <button class="lb-nav lb-next" @onclick="() => LbIdx = (LbIdx + 1) % Product.Images.Count">›</button>
+            <img class="lb-img" src="@Product.Images[LbIdx]" alt="@Product.Name" />
+            <div class="lb-thumbs">
+                @for (int i = 0; i < Product.Images.Count; i++)
+                {
+                    var idx = i;
+                    <img class="lb-thumb @(LbIdx == idx ? "active" : "")"
+                         src="@Product.Images[idx]"
+                         @onclick="() => LbIdx = idx" />
+                }
+            </div>
+            <div class="lb-counter">@(LbIdx+1) / @Product.Images.Count</div>
+        </div>
+    }
+
+    <!-- STICKY BAR -->
+    <div class="sticky-bar @(ShowStickyBar ? "visible" : "")">
+        <div class="sticky-info">
+            <img src="@Product.ImageUrl" alt="@Product.Name" class="sticky-img" />
+            <div>
+                <div class="sticky-name">@Product.Name</div>
+                <div class="sticky-price">£@Product.Price.ToString("N0")</div>
+            </div>
+        </div>
+        <button class="sticky-add-btn" @onclick="AddToCart" disabled="@(StockLevel <= 0)">@(StockLevel <= 0 ? "Out of Stock" : "Add to Sparkle Bag ✦")</button>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    Product? Product;
+    List<Product> Related = new();
+    List<Review> Reviews = new();
+
+    string CurrentImage = "";
+    int CurrentIndex = 0;
+
+    string ActiveTab = "description";
+    int Qty = 1;
+    bool IsWishlisted = false;
+    bool AddedFeedback = false;
+    int  StockLevel    = 99; // loaded with product
+    bool ShowStickyBar = false;
+    bool LightboxOpen = false;
+    int LbIdx = 0;
+    int ReviewCount = 48;
+
+    // Tab helpers — named methods avoid C# char-literal / quote conflicts in Razor attributes
+    void ShowDescriptionTab() => ActiveTab = "description";
+    void ShowDetailsTab()     => ActiveTab = "details";
+    void ShowShippingTab()    => ActiveTab = "shipping";
+    void ShowReviewsTab()     => ActiveTab = "reviews";
+
+    // Zoom state
+    bool ZoomActive = false;
+    double LensX = 0, LensY = 0;
+    double BgX = 0, BgY = 0;
+    double BoxW = 500, BoxH = 500;
+    double LensSize = 130;
+    double ZoomFactor = 3.0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Product  = null;
+        Related  = new();
+        Reviews  = new();
+        ReviewCount = 0;
+        StateHasChanged();   // show loading state
+
+        try
+        {
+            // ── API CALLS ─────────────────────────────────────────
+            var dto     = await Api.GetProductAsync(Id);
+            var related = await Api.GetRelatedAsync(Id, 4);
+            var reviews = await Api.GetReviewsAsync(Id);
+
+            if (dto != null)
+            {
+                // Map API DTO → local Product view-model
+                Product = new Product
+                {
+                    Id          = dto.Id,
+                    Name        = dto.Name,
+                    Description = dto.Description,
+                    Material    = dto.Material,
+                    Price       = dto.Price,
+                    OldPrice    = dto.OldPrice,
+                    Badge       = dto.Badge,
+                    Category    = dto.Category,
+                    Stars       = dto.Stars,
+                    ImageUrl    = dto.ImageUrl,
+                    IsVatApplicable = dto.IsVatApplicable,
+                    Images      = dto.Images,
+                };
+                CurrentImage = Product.Images.FirstOrDefault() ?? Product.ImageUrl;
+                CurrentIndex = 0;
+            }
+
+            Related = related?.Select(r => new Product
+            {
+                Id       = r.Id, Name     = r.Name, Material = r.Material,
+                Price    = r.Price, OldPrice = r.OldPrice, Badge = r.Badge,
+                Category = r.Category, Stars = r.Stars, ImageUrl = r.ImageUrl,
+                Images   = new List<string> { r.ImageUrl },
+            }).ToList() ?? new();
+
+            Reviews = reviews?.Select(r => new Review
+            {
+                AuthorName  = r.AuthorName, Date  = r.Date,
+                Stars       = r.Stars,      Title = r.Title,
+                Body        = r.Body,       Verified = r.Verified,
+                HelpfulCount= r.HelpfulCount,
+            }).ToList() ?? new();
+
+            ReviewCount = Reviews.Count;
+        }
+        catch
+        {
+            // Offline / API unavailable — fall back to in-memory data
+            Product = FallbackSvc.GetById(Id);
+            if (Product != null)
+            {
+                CurrentImage = Product.Images.FirstOrDefault() ?? Product.ImageUrl;
+                Related      = FallbackSvc.GetRelated(Id, 4);
+                Reviews      = FallbackSvc.GetReviews(Id);
+                ReviewCount  = Reviews.Count;
+            }
+        }
+    }
+
+    void SetImage(int idx)
+    {
+        CurrentIndex = idx;
+        CurrentImage = Product!.Images[idx];
+        ZoomActive = false; // reset zoom on image change
+    }
+
+    void ChangeImage(int dir)
+    {
+        SetImage((CurrentIndex + dir + Product!.Images.Count) % Product.Images.Count);
+    }
+
+    // ── ZOOM (Pure Blazor — no JS needed for basic positioning) ──────────
+    void ZoomEnter(MouseEventArgs e)
+    {
+        ZoomActive = true;
+        // Estimate box dimensions (will be updated on first mousemove from JS)
+        BoxW = 500; BoxH = 500;
+    }
+
+    void ZoomLeave(MouseEventArgs e) => ZoomActive = false;
+
+    void ZoomMove(MouseEventArgs e)
+    {
+        if (!ZoomActive) return;
+
+        // e.OffsetX/Y = mouse position relative to the element
+        double x = e.OffsetX;
+        double y = e.OffsetY;
+
+        double hl = LensSize / 2;
+
+        // Clamp lens so it stays inside the box
+        LensX = Math.Max(0, Math.Min(x - hl, BoxW - LensSize));
+        LensY = Math.Max(0, Math.Min(y - hl, BoxH - LensSize));
+
+        // Background offset for zoomed panel
+        BgX = LensX * ZoomFactor;
+        BgY = LensY * ZoomFactor;
+    }
+
+    // ── CART ────────────────────────────────────────────────────────────
+    async Task AddToCart()
+    {
+        if (Product == null) return;
+        Cart.AddItem(Product, Qty, "YellowGold18K", Product.Category == "rings" ? null : null);
+        AddedFeedback = true;
+        await Task.Delay(2200);
+        AddedFeedback = false;
+    }
+
+    async Task BuyNow()
+    {
+        if (Product == null) return;
+        Cart.AddItem(Product, Qty, "YellowGold18K", Product.Category == "rings" ? null : null);
+        Nav.NavigateTo("/checkout");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Product == null) return;
+        // Touch swipe on image gallery
+        await JS.InvokeVoidAsync("initTouchSwipe", "mainImgBox", DotNetObjectReference.Create(this));
+        // Sticky bar: show once user scrolls past gallery
+        await JS.InvokeVoidAsync("initStickyBar", "galleryZoomWrap");
+    }
+
+    [JSInvokable]
+    public void SwipeLeft()  => ChangeImage(1);
+
+    [JSInvokable]
+    public void SwipeRight() => ChangeImage(-1);
+}

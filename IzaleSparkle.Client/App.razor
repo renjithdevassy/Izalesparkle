@@ -1,0 +1,16 @@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(IzaleSparkle.Client.Shared.MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Page Not Found — Izale Sparkle</PageTitle>
+        <LayoutView Layout="@typeof(IzaleSparkle.Client.Shared.MainLayout)">
+            <div style="text-align:center;padding:6rem 2rem">
+                <h1 style="font-family:'Playfair Display',serif;font-size:3rem;font-weight:400;color:#1C1A16">Page Not Found</h1>
+                <p style="color:#7A6E5F;margin:1rem 0 2rem">The page you're looking for doesn't exist.</p>
+                <a href="/" style="background:#1C1A16;color:#F7E9C0;padding:1rem 2.5rem;font-size:0.68rem;letter-spacing:0.25em;text-transform:uppercase">Back to Home</a>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

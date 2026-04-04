@@ -1,0 +1,661 @@
+@page "/admin/orders/edit/{Id:int}"
+@layout AdminLayout
+@inject IApiClient Api
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">Order Detail</h1>
+    <a href="/admin/orders" class="btn btn-outline" style="font-size:.68rem">← Back to Orders</a>
+</div>
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else if (Order == null)
+{
+    <div class="admin-error-banner">⚠️ Order not found.</div>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(SuccessMsg))
+    {
+        <div class="admin-success-banner">✓ @SuccessMsg</div>
+    }
+    @if (!string.IsNullOrEmpty(ErrorMsg))
+    {
+        <div class="admin-error-banner">⚠️ @ErrorMsg</div>
+    }
+
+    <div class="order-detail-grid">
+
+        <!-- ── LEFT COLUMN ── -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+            <!-- Order header -->
+            <div class="admin-form-card">
+                <div class="order-detail-header">
+                    <div>
+                        <div class="admin-order-num" style="font-size:1.1rem">@Order.OrderNumber</div>
+                        <div style="font-size:.68rem;color:var(--warm-gray);margin-top:.3rem">
+                            Placed @Order.CreatedAt.ToString("dddd, dd MMMM yyyy") at @Order.CreatedAt.ToString("HH:mm") UTC
+                        </div>
+                    </div>
+                    <span class="order-status-chip @Order.Status.ToLower()">@Order.Status</span>
+                </div>
+            </div>
+
+            <!-- Items -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title" style="display:flex;justify-content:space-between;align-items:center">
+                    <span>Order Items (@(EditableItems.Count))</span>
+                    <button class="admin-action-btn" style="font-size:.62rem"
+                            @onclick="() => ShowAddItem = true">+ Add Item</button>
+                </div>
+                <div class="order-items-list">
+                    @foreach (var item in EditableItems)
+                    {
+                        <div class="order-item-row">
+                            <img src="@item.ImageUrl" alt="@item.ProductName" class="order-item-img" />
+                            <div class="order-item-info">
+                                <div class="order-item-name">@item.ProductName</div>
+                                <div class="order-item-meta">@item.Metal</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
+                                <button class="qty-btn" @onclick="() => ChangeQty(item, -1)"
+                                        disabled="@(item.Quantity <= 1)">−</button>
+                                <span style="min-width:24px;text-align:center;font-size:.9rem;font-family:'Playfair Display',serif">
+                                    @item.Quantity
+                                </span>
+                                <button class="qty-btn" @onclick="() => ChangeQty(item, +1)">+</button>
+                            </div>
+                            <div class="order-item-prices" style="margin-left:.5rem">
+                                <div class="admin-price">£@((item.UnitPrice * item.Quantity).ToString("N2"))</div>
+                                <div style="font-size:.62rem;color:var(--warm-gray)">£@item.UnitPrice.ToString("N2") each</div>
+                            </div>
+                            <button class="img-gallery-remove" style="position:static;opacity:1;width:24px;height:24px;margin-left:.3rem"
+                                    @onclick="() => RemoveEditableItem(item)" title="Remove item">✕</button>
+                        </div>
+                    }
+                    @if (!EditableItems.Any())
+                    {
+                        <div class="admin-empty" style="padding:1rem">No items. Use + Add Item above.</div>
+                    }
+                </div>
+
+                @if (ItemsChanged)
+                {
+                    <div style="margin-top:.8rem;display:flex;gap:.5rem;align-items:center">
+                        <button class="btn btn-gold" style="font-size:.65rem;flex:1"
+                                @onclick="SaveItems" disabled="@SavingItems">
+                            @(SavingItems ? "Saving…" : "Save Item Changes ✦")
+                        </button>
+                        <button class="btn btn-outline" style="font-size:.65rem"
+                                @onclick="ResetItems">Undo</button>
+                    </div>
+                }
+
+                <!-- Totals -->
+                <div class="order-totals" style="margin-top:1rem">
+                    <div class="order-total-row"><span>Subtotal</span><span>£@Order.Subtotal.ToString("N2")</span></div>
+                    @if (Order.Discount > 0)
+                    {
+                        <div class="order-total-row discount">
+                            <span>
+                                Discount
+                                @if (!string.IsNullOrEmpty(Order.PromoCode))
+                                {
+                                    <span style="font-family:monospace;font-size:.7rem;background:rgba(22,163,74,.1);color:#15803d;padding:.1rem .4rem;border-radius:3px;margin-left:.3rem">@Order.PromoCode</span>
+                                }
+                            </span>
+                            <span style="color:#22c55e;font-weight:600">−£@Order.Discount.ToString("N2")</span>
+                        </div>
+                    }
+                    <div class="order-total-row"><span>Shipping (@Order.ShippingTier)</span><span>£@Order.Shipping.ToString("N2")</span></div>
+                    @if (Order.Vat > 0)
+                    {
+                        <div class="order-total-row"><span>VAT (20% on applicable items)</span><span>£@Order.Vat.ToString("N2")</span></div>
+                    }
+                    <div class="order-total-row grand"><span>Total</span><span>£@Order.Total.ToString("N2")</span></div>
+                </div>
+            </div>
+
+            <!-- Customer & Shipping -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title">Customer & Delivery</div>
+                <div class="order-address-grid">
+                    <div>
+                        <div class="order-label">Customer Email</div>
+                        <div class="order-value">@Order.CustomerEmail</div>
+                    </div>
+                    <div>
+                        <div class="order-label">Payment Method</div>
+                        <div class="order-value">@Order.PaymentMethod</div>
+                    </div>
+                    <div style="grid-column:span 2">
+                        <div class="order-label">Delivery Address</div>
+                        <div class="order-value">
+                            @Order.ShipFirstName @Order.ShipLastName<br />
+                            @Order.ShipLine1
+                            @if (!string.IsNullOrEmpty(Order.ShipLine2)) { <text>, @Order.ShipLine2</text> }<br />
+                            @Order.ShipCity, @Order.ShipPostcode<br />
+                            @Order.ShipCountry
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── RIGHT COLUMN: Edit Panel ── -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem">
+
+            <!-- Status update -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title">Update Status</div>
+                <div class="admin-field">
+                    <label>Order Status</label>
+                    <select @bind="SelectedStatus" class="admin-select" style="width:100%">
+                        <option value="Pending">⏳ Pending</option>
+                        <option value="PaymentReceived">💳 Payment Received</option>
+                        <option value="Processing">⚙️ Processing</option>
+                        <option value="Shipped">🚚 Shipped</option>
+                        <option value="Delivered">✅ Delivered</option>
+                        <option value="Cancelled">❌ Cancelled</option>
+                        <option value="Refunded">↩️ Refunded</option>
+                    </select>
+                </div>
+
+                <!-- Status timeline -->
+                <div class="order-timeline">
+                    @foreach (var s in StatusOrder)
+                    {
+                        var reached = StatusOrder.IndexOf(s) <= StatusOrder.IndexOf(Order.Status);
+                        <div class="order-tl-step @(reached ? "done" : "") @(s == Order.Status ? "current" : "")">
+                            <div class="order-tl-dot"></div>
+                            <div class="order-tl-label">@s</div>
+                        </div>
+                    }
+                </div>
+
+                <div class="admin-field" style="margin-top:1rem">
+                    <label>Admin Notes <small>internal only</small></label>
+                    <textarea @bind="AdminNotes" rows="3"
+                              placeholder="Tracking number, courier, internal notes…"></textarea>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Order.AdminNotes) && Order.AdminNotes != AdminNotes)
+                {
+                    <div style="font-size:.65rem;color:var(--warm-gray);margin-bottom:.8rem">
+                        Current notes: <em>@Order.AdminNotes</em>
+                    </div>
+                }
+
+                <!-- Tracking number -->
+                <div class="admin-field" style="margin-top:1rem">
+                    <label>
+                        Tracking Number
+                        <small>sent to customer when status = Shipped</small>
+                    </label>
+                    <input @bind="TrackingNumber" @bind:event="oninput"
+                           placeholder="e.g. JD000000000GB · Carrier reference" />
+                    @if (!string.IsNullOrEmpty(Order?.TrackingNumber))
+                    {
+                        <div style="font-size:.65rem;color:var(--warm-gray);margin-top:.25rem">
+                            Current: <code>@Order.TrackingNumber</code>
+                        </div>
+                    }
+                </div>
+
+                <!-- Discount code -->
+                <div class="admin-field" style="margin-top:1rem">
+                    <label>Discount Code <small>override or add manually</small></label>
+                    <div style="display:flex;gap:.5rem;align-items:center">
+                        <input @bind="DiscountCodeInput" @bind:event="oninput"
+                               placeholder="e.g. SPARKLE10"
+                               style="flex:1;text-transform:uppercase;font-family:monospace" />
+                        <button type="button" class="btn btn-outline"
+                                style="font-size:.6rem;padding:.6rem .9rem;white-space:nowrap"
+                                @onclick="ValidateAdminDiscount" disabled="@ValidatingDiscount">
+                            @(ValidatingDiscount ? "…" : "Check")
+                        </button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(DiscountMsg))
+                    {
+                        <div style="font-size:.72rem;margin-top:.35rem;color:@(DiscountValid ? "#16a34a" : "#c0392b")">
+                            @(DiscountValid ? "✓" : "✗") @DiscountMsg
+                        </div>
+                    }
+                    @if (Order.Discount > 0 || !string.IsNullOrEmpty(Order.PromoCode))
+                    {
+                        <div style="font-size:.65rem;color:var(--warm-gray);margin-top:.3rem">
+                            Current: @(Order.PromoCode ?? "—") · −£@Order.Discount.ToString("N2")
+                        </div>
+                    }
+                </div>
+
+                <button class="btn btn-gold" style="width:100%;margin-top:.5rem"
+                        @onclick="SaveOrder" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save Changes ✦")
+                </button>
+            </div>
+
+            <!-- Quick status buttons -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title">Quick Actions</div>
+                <div style="display:flex;flex-direction:column;gap:.5rem">
+                    @foreach (var action in QuickActions)
+                    {
+                        <button class="admin-action-btn" style="justify-content:flex-start;padding:.7rem 1rem"
+                                @onclick="() => QuickUpdateStatus(action.status)">
+                            @action.icon Mark as @action.label
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Invoice -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title">Invoice</div>
+                <p class="admin-field-hint" style="margin-bottom:1rem">
+                    PDF invoice · <strong>@(Order?.OrderNumber)</strong>
+                </p>
+                @if (!string.IsNullOrEmpty(InvoiceMsg))
+                {
+                    <div class="@(InvoiceSuccess ? "admin-success-banner" : "admin-error-banner")" style="font-size:.72rem;margin-bottom:.8rem">
+                        @InvoiceMsg
+                    </div>
+                }
+                <div style="display:flex;flex-direction:column;gap:.5rem">
+                    <button class="btn btn-gold" style="width:100%;font-size:.68rem"
+                            @onclick="DownloadInvoice" disabled="@InvoiceWorking">
+                        @(InvoiceWorking ? "Generating…" : "⬇ Download Invoice PDF")
+                    </button>
+                    <button class="admin-action-btn" style="justify-content:center;padding:.7rem"
+                            @onclick="ResendToCustomer" disabled="@InvoiceWorking">
+                        @(InvoiceWorking ? "Sending…" : "📧 Resend Invoice to Customer")
+                    </button>
+                </div>
+                <div class="admin-field-hint" style="margin-top:.7rem">
+                    Sends the confirmation email + attached PDF invoice to the customer's email address.
+                </div>
+            </div>
+
+            <!-- Cancel Order -->
+            @if (Order.Status != "Cancelled" && Order.Status != "Delivered" && Order.Status != "Refunded")
+            {
+                <div class="admin-form-card" style="border-color:rgba(220,38,38,.2)">
+                    <div class="admin-form-section-title" style="color:#dc2626">Cancel Order</div>
+                    @if (!ShowCancelConfirm)
+                    {
+                        <button class="btn btn-outline" style="width:100%;border-color:#dc2626;color:#dc2626;font-size:.68rem"
+                                @onclick="() => ShowCancelConfirm = true">
+                            ❌ Cancel This Order
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="admin-field">
+                            <label>Cancellation Reason <small>optional</small></label>
+                            <input @bind="CancelReason" placeholder="e.g. Customer request, out of stock…" />
+                        </div>
+                        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+                            <button class="btn btn-outline" style="flex:1;font-size:.65rem"
+                                    @onclick="() => ShowCancelConfirm = false">Keep Order</button>
+                            <button class="btn btn-dark" style="flex:1;font-size:.65rem;background:#dc2626;border-color:#dc2626"
+                                    @onclick="AdminCancelOrder" disabled="@Saving">
+                                @(Saving ? "Cancelling…" : "Confirm Cancel")
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <!-- Order meta -->
+            <div class="admin-form-card">
+                <div class="admin-form-section-title">Order Info</div>
+                <div class="order-meta-grid">
+                    <div class="order-label">Order ID</div><div class="order-value">#@Order.Id</div>
+                    <div class="order-label">Order Number</div><div class="order-value" style="font-family:monospace;font-size:.75rem">@Order.OrderNumber</div>
+                    <div class="order-label">Promo Code</div><div class="order-value">@(Order.PromoCode ?? "—")</div>
+                    <div class="order-label">Shipping</div><div class="order-value">@Order.ShippingTier</div>
+                    <div class="order-label">Payment</div><div class="order-value">@Order.PaymentMethod</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- ── ADD ITEM MODAL ── -->
+@if (ShowAddItem && Order != null)
+{
+    <div class="admin-modal-overlay" @onclick="() => { ShowAddItem = false; SearchResults = new(); }">
+        <div class="admin-modal" style="max-width:520px;text-align:left;max-height:90vh;overflow-y:auto"
+             @onclick:stopPropagation>
+            <h3 class="admin-modal-title" style="text-align:left;margin-bottom:1.2rem">Add Item to Order</h3>
+
+            <div class="admin-field">
+                <label>Search Product</label>
+                <div style="display:flex;gap:.5rem">
+                    <input @bind="AddItemSearch" @bind:event="oninput"
+                           @onkeydown="@(async e => { if (e.Key == "Enter") await SearchProducts(); })"
+                           placeholder="Search by name…" style="flex:1" />
+                    <button class="btn btn-dark" style="font-size:.62rem;padding:.6rem .9rem"
+                            @onclick="SearchProducts" disabled="@SearchingProducts">
+                        @(SearchingProducts ? "…" : "Search")
+                    </button>
+                </div>
+            </div>
+
+            @if (SearchResults.Any())
+            {
+                <div style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem">
+                    @foreach (var p in SearchResults)
+                    {
+                        <div style="display:flex;align-items:center;gap:.8rem;padding:.7rem;border:1px solid var(--border);background:var(--cream);border-radius:4px">
+                            <img src="@p.ImageUrl" style="width:44px;height:44px;object-fit:cover;border-radius:3px;flex-shrink:0" />
+                            <div style="flex:1;min-width:0">
+                                <div style="font-size:.82rem;font-weight:500">@p.Name</div>
+                                <div style="font-size:.68rem;color:var(--warm-gray)">@p.Material · £@p.Price.ToString("N2")</div>
+                            </div>
+                            <button class="admin-action-btn" style="flex-shrink:0"
+                                    @onclick="() => AddItemToOrder(p)">Add</button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Quantity</label>
+                    <input type="number" @bind="AddQty" min="1" step="1" />
+                </div>
+                <div class="admin-field">
+                    <label>Metal</label>
+                    <select @bind="AddMetal" class="admin-select">
+                        <option value="YellowGold18K">18K Yellow Gold</option>
+                        <option value="WhiteGold18K">18K White Gold</option>
+                        <option value="RoseGold18K">18K Rose Gold</option>
+                        <option value="Platinum">Platinum</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="admin-modal-actions" style="justify-content:flex-end">
+                <button class="btn btn-outline" @onclick="() => { ShowAddItem = false; SearchResults = new(); }">Close</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    bool Loading = true;
+    bool Saving  = false;
+    AdminOrderResponse? Order;
+    string SelectedStatus = "";
+    string AdminNotes     = "";
+    string SuccessMsg     = "";
+    string ErrorMsg       = "";
+
+    List<string> StatusOrder = new()
+        { "Pending", "PaymentReceived", "Processing", "Shipped", "Delivered" };
+
+    // ── Editable items ───────────────────────────────────────────
+    record EditItem(int ProductId, string ProductName, string ImageUrl,
+                    decimal UnitPrice, int Quantity, string Metal)
+    {
+        public int Quantity { get; set; } = Quantity;
+    }
+    List<EditItem> EditableItems = new();
+    bool ItemsChanged  = false;
+    bool SavingItems   = false;
+    bool ShowAddItem   = false;
+    string AddItemSearch   = string.Empty;
+    List<ProductSummaryResponse> SearchResults = new();
+    bool SearchingProducts = false;
+    int  AddQty = 1;
+    string AddMetal = "YellowGold18K";
+
+    void InitEditableItems()
+    {
+        if (Order == null) return;
+        EditableItems = Order.Items.Select(i => new EditItem(
+            i.ProductId, i.ProductName, i.ImageUrl,
+            i.UnitPrice, i.Quantity, i.Metal)).ToList();
+        ItemsChanged = false;
+    }
+
+    void ChangeQty(EditItem item, int delta)
+    {
+        item.Quantity = Math.Max(1, item.Quantity + delta);
+        ItemsChanged  = true;
+    }
+
+    void RemoveEditableItem(EditItem item)
+    {
+        EditableItems.Remove(item);
+        ItemsChanged = true;
+    }
+
+    void ResetItems() { InitEditableItems(); }
+
+    async Task SaveItems()
+    {
+        if (Order == null) return;
+        SavingItems = true; SuccessMsg = ""; ErrorMsg = "";
+        try
+        {
+            var changes = EditableItems
+                .Select(i => new ModifyOrderItemRequest(i.ProductId, i.Quantity))
+                .ToList();
+            // Items removed from EditableItems but still on order need qty=0 to delete
+            foreach (var orig in Order.Items)
+            {
+                if (!EditableItems.Any(e => e.ProductId == orig.ProductId))
+                    changes.Add(new ModifyOrderItemRequest(orig.ProductId, 0));
+            }
+            var result = await Api.ModifyOrderItemsAsync(Id, changes);
+            if (result?.Success == true && result.Data != null)
+            {
+                Order     = result.Data;
+                InitEditableItems();
+                SuccessMsg = "Items updated.";
+            }
+            else ErrorMsg = result?.Message ?? "Failed to update items.";
+        }
+        catch { ErrorMsg = "Error saving items."; }
+        finally { SavingItems = false; }
+    }
+
+    async Task SearchProducts()
+    {
+        if (string.IsNullOrWhiteSpace(AddItemSearch)) { SearchResults = new(); return; }
+        SearchingProducts = true;
+        try
+        {
+            var results = await Api.GetProductsAsync(
+                new GetProductsRequest(Search: AddItemSearch, PageSize: 8));
+            SearchResults = results?.Items?.ToList() ?? new();
+        }
+        catch { }
+        finally { SearchingProducts = false; }
+    }
+
+    async Task AddItemToOrder(ProductSummaryResponse product)
+    {
+        SavingItems = true; SuccessMsg = ""; ErrorMsg = "";
+        try
+        {
+            var result = await Api.AddOrderItemAsync(Id,
+                new AddItemRequest(product.Id, AddQty, AddMetal));
+            if (result?.Success == true && result.Data != null)
+            {
+                Order     = result.Data;
+                InitEditableItems();
+                SuccessMsg   = $"{product.Name} added to order.";
+                ShowAddItem  = false;
+                AddItemSearch = string.Empty;
+                SearchResults = new();
+            }
+            else ErrorMsg = result?.Message ?? "Failed to add item.";
+        }
+        catch { ErrorMsg = "Error adding item."; }
+        finally { SavingItems = false; }
+    }
+
+    // ── Cancel order ──────────────────────────────────────────────
+    bool    ShowCancelConfirm = false;
+    string  CancelReason      = string.Empty;
+
+    async Task AdminCancelOrder()
+    {
+        if (Order == null) return;
+        Saving = true; SuccessMsg = ""; ErrorMsg = "";
+        try
+        {
+            var result = await Api.CancelOrderAdminAsync(Id, CancelReason);
+            if (result?.Success == true && result.Data != null)
+            {
+                Order          = result.Data;
+                SelectedStatus = Order.Status;
+                SuccessMsg     = "Order cancelled.";
+                ShowCancelConfirm = false;
+            }
+            else ErrorMsg = result?.Message ?? "Cancel failed.";
+        }
+        catch { ErrorMsg = "Error cancelling order."; }
+        finally { Saving = false; }
+    }
+
+    record QuickAction(string status, string label, string icon);
+    List<QuickAction> QuickActions = new()
+    {
+        new("PaymentReceived", "Payment Received", "💳"),
+        new("Processing",      "Processing",       "⚙️"),
+        new("Shipped",         "Shipped",          "🚚"),
+        new("Delivered",       "Delivered",        "✅"),
+        new("Cancelled",       "Cancelled",        "❌"),
+    };
+
+    // Discount state
+    string  TrackingNumber      = string.Empty;
+    string  DiscountCodeInput   = string.Empty;
+    string  DiscountMsg         = string.Empty;
+    bool    DiscountValid       = false;
+    decimal DiscountOverride    = 0;
+    bool    ValidatingDiscount  = false;
+
+    async Task ValidateAdminDiscount()
+    {
+        if (string.IsNullOrWhiteSpace(DiscountCodeInput)) return;
+        ValidatingDiscount = true; DiscountMsg = string.Empty;
+        try
+        {
+            var result = await Api.ValidateDiscountAsync(
+                DiscountCodeInput.Trim(), Order?.Subtotal ?? 0);
+            DiscountValid   = result?.Valid ?? false;
+            DiscountOverride = result?.DiscountAmount ?? 0;
+            DiscountMsg     = DiscountValid
+                ? $"{result!.DiscountPercent}% off · saves £{result.DiscountAmount:N2} on this order"
+                : result?.Message ?? "Invalid code";
+        }
+        catch { DiscountMsg = "Could not validate."; DiscountValid = false; }
+        finally { ValidatingDiscount = false; }
+    }
+
+    // Invoice state
+    bool   InvoiceWorking = false;
+    bool   InvoiceSuccess = false;
+    string InvoiceMsg     = string.Empty;
+
+    async Task DownloadInvoice()
+    {
+        InvoiceWorking = true; InvoiceMsg = string.Empty;
+        try
+        {
+            var bytes = await Api.DownloadInvoiceAsync(Id);
+            if (bytes != null && bytes.Length > 0)
+            {
+                var b64      = Convert.ToBase64String(bytes);
+                var filename = $"Izale-Sparkle-Invoice-{Order?.OrderNumber}.pdf";
+                await JS.InvokeVoidAsync("downloadFileFromBytes", b64, filename, "application/pdf");
+                InvoiceSuccess = true;
+                InvoiceMsg     = "Invoice downloaded.";
+            }
+            else { InvoiceSuccess = false; InvoiceMsg = "Failed to generate invoice."; }
+        }
+        catch { InvoiceSuccess = false; InvoiceMsg = "Download error — check SMTP/PDF config."; }
+        finally { InvoiceWorking = false; }
+    }
+
+    async Task ResendToCustomer()
+    {
+        InvoiceWorking = true; InvoiceMsg = string.Empty;
+        try
+        {
+            var ok = await Api.ResendInvoiceAsync(Id);
+            InvoiceSuccess = ok;
+            InvoiceMsg = ok
+                ? $"Invoice emailed to {Order?.CustomerEmail}."
+                : "Send failed — check SMTP configuration in appsettings.json.";
+        }
+        catch { InvoiceSuccess = false; InvoiceMsg = "Send error."; }
+        finally { InvoiceWorking = false; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Loading = true;
+        try
+        {
+            Order = await Api.GetAdminOrderAsync(Id);
+            if (Order != null)
+            {
+                SelectedStatus  = Order.Status;
+                AdminNotes      = Order.AdminNotes ?? "";
+                TrackingNumber  = Order.TrackingNumber ?? "";
+                InitEditableItems();
+            }
+        }
+        catch { ErrorMsg = "Failed to load order."; }
+        finally { Loading = false; }
+    }
+
+    async Task QuickUpdateStatus(string status)
+    {
+        SelectedStatus = status;
+        await SaveOrder();
+    }
+
+    async Task SaveOrder()
+    {
+        if (Order == null) return;
+        Saving     = true;
+        SuccessMsg = "";
+        ErrorMsg   = "";
+        try
+        {
+            var result = await Api.UpdateOrderAsync(Id,
+                new UpdateOrderStatusRequest(Id, SelectedStatus, AdminNotes,
+                    DiscountValid && !string.IsNullOrEmpty(DiscountCodeInput)
+                        ? DiscountCodeInput.Trim().ToUpper() : null,
+                    DiscountValid && DiscountOverride > 0 ? DiscountOverride : null,
+                    string.IsNullOrWhiteSpace(TrackingNumber) ? null : TrackingNumber.Trim()));
+
+            if (result?.Success == true && result.Data != null)
+            {
+                Order         = result.Data;
+                SelectedStatus= Order.Status;
+                AdminNotes    = Order.AdminNotes ?? "";
+                SuccessMsg    = $"Order updated to {Order.Status}.";
+            }
+            else ErrorMsg = result?.Message ?? "Update failed.";
+        }
+        catch { ErrorMsg = "Failed to save changes."; }
+        finally { Saving = false; }
+    }
+}

@@ -1,0 +1,107 @@
+@page "/admin/login"
+@layout MainLayout
+@inject IApiClient Api
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>Admin Login — Izale Sparkle</PageTitle>
+
+<div class="auth-page auth-page-dark">
+    <div class="auth-card auth-card-dark">
+        <div class="auth-brand">
+            <a href="/" class="auth-logo">Izale <span class="gold">✦</span> Sparkle</a>
+            <div class="admin-badge" style="margin-top:.4rem">Admin Panel</div>
+        </div>
+
+        <h1 class="auth-title" style="color:var(--cream-soft)">Administrator Login</h1>
+        <p class="auth-subtitle" style="color:rgba(245,240,225,.4)">Restricted access — authorised personnel only</p>
+
+        @if (!string.IsNullOrEmpty(ErrorMsg))
+        {
+            <div class="auth-error">⚠️ @ErrorMsg</div>
+        }
+
+        <div class="auth-form">
+            <div class="auth-field auth-field-dark">
+                <label>Admin Email</label>
+                <input type="email" inputmode="email" autocomplete="username"
+                       @bind="Email" placeholder="admin@izalesparkle.com"
+                       class="@(ShowErr && string.IsNullOrWhiteSpace(Email) ? "field-error" : "")" />
+            </div>
+            <div class="auth-field auth-field-dark">
+                <label>Password</label>
+                <div class="auth-pass-wrap">
+                    <input type="@(ShowPass ? "text" : "password")" autocomplete="current-password"
+                           @bind="Password" placeholder="••••••••"
+                           @onkeydown="OnKeyDown"
+                           class="@(ShowErr && string.IsNullOrWhiteSpace(Password) ? "field-error" : "")" />
+                    <button type="button" class="auth-pass-toggle" @onclick="() => ShowPass = !ShowPass">
+                        @(ShowPass ? "🙈" : "👁")
+                    </button>
+                </div>
+            </div>
+
+            <div class="auth-seed-hint">
+                Default credentials: <code>admin@izalesparkle.com</code> / <code>Admin@123!</code>
+            </div>
+
+            <button class="auth-submit-btn auth-submit-gold" @onclick="DoLogin" disabled="@Loading">
+                @(Loading ? "Signing in…" : "Sign In to Admin Panel ✦")
+            </button>
+        </div>
+
+        <div class="auth-links" style="justify-content:center;margin-top:1.5rem">
+            <a href="/login" style="font-size:.68rem;color:rgba(245,240,225,.35)">← Customer Login</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    string Email    = "";
+    string Password = "";
+    string ErrorMsg = "";
+    bool   Loading  = false;
+    bool   ShowErr  = false;
+    bool   ShowPass = false;
+
+    protected override void OnInitialized()
+    {
+        // Already logged in as admin → go straight to panel
+        if (Auth.IsAdmin) Nav.NavigateTo("/admin");
+    }
+
+    async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+
+    async Task DoLogin()
+    {
+        ShowErr  = false;
+        ErrorMsg = "";
+
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        { ShowErr = true; ErrorMsg = "Please enter email and password."; return; }
+
+        Loading = true;
+        try
+        {
+            var result = await Api.LoginAsync(new LoginRequest(Email, Password));
+
+            if (result?.Success == true && result.Token != null)
+            {
+                if (result.Role != "Admin")
+                {
+                    ErrorMsg = "Access denied. Admin credentials required.";
+                    return;
+                }
+                await Auth.SetTokenAsync(JS, result.Token);
+                Nav.NavigateTo("/admin");
+            }
+            else ErrorMsg = result?.Message ?? "Invalid credentials.";
+        }
+        catch { ErrorMsg = "Unable to connect. Please try again."; }
+        finally { Loading = false; }
+    }
+}

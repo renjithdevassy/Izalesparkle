@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>IzaleSparkle.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\IzaleSparkle.Domain\IzaleSparkle.Domain.csproj" />
+    <ProjectReference Include="..\IzaleSparkle.Contracts\IzaleSparkle.Contracts.csproj" />
+    <PackageReference Include="MediatR" Version="12.*" />
+    <!-- Core validators -->
+    <PackageReference Include="FluentValidation" Version="11.*" />
+    <!-- AddValidatorsFromAssembly() extension method -->
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.*" />
+    <PackageReference Include="AutoMapper" Version="13.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.*" />
+  </ItemGroup>
+</Project>

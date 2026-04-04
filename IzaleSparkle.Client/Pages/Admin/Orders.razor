@@ -1,0 +1,199 @@
+@page "/admin/orders"
+@layout AdminLayout
+@inject IApiClient Api
+@inject NavigationManager Nav
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">
+        Orders
+        @if (Report != null)
+        {
+            <span class="admin-count-badge">@Report.TotalOrders</span>
+        }
+    </h1>
+</div>
+
+@if (Report != null)
+{
+    <!-- ── STAT CARDS ── -->
+    <div class="admin-stats-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="admin-stat-card gold">
+            <div class="asc-icon">💷</div>
+            <div class="asc-num">£@Report.TotalRevenue.ToString("N0")</div>
+            <div class="asc-label">Total Revenue</div>
+            <div class="asc-sub">£@Report.TodayRevenue.ToString("N0") today</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">⏳</div>
+            <div class="asc-num">@Report.PendingOrders</div>
+            <div class="asc-label">Pending</div>
+            <div class="asc-sub">Awaiting processing</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">🚚</div>
+            <div class="asc-num">@Report.ShippedOrders</div>
+            <div class="asc-label">Shipped</div>
+            <div class="asc-sub">@Report.DeliveredOrders delivered</div>
+        </div>
+        <div class="admin-stat-card">
+            <div class="asc-icon">❌</div>
+            <div class="asc-num">@Report.CancelledOrders</div>
+            <div class="asc-label">Cancelled</div>
+            <div class="asc-sub">All time</div>
+        </div>
+    </div>
+
+    <!-- ── STATUS PIPELINE ── -->
+    <div class="order-pipeline">
+        @foreach (var s in Statuses)
+        {
+            var count = s.Key switch {
+                "Pending"         => Report.PendingOrders,
+                "Processing"      => Report.ProcessingOrders,
+                "Shipped"         => Report.ShippedOrders,
+                "Delivered"       => Report.DeliveredOrders,
+                "Cancelled"       => Report.CancelledOrders,
+                _                 => 0
+            };
+            <button class="order-pipeline-step @(StatusFilter == s.Key ? "active" : "")"
+                    @onclick="() => FilterByStatus(s.Key)">
+                <span class="ops-icon">@s.Value.icon</span>
+                <span class="ops-label">@s.Key</span>
+                <span class="ops-count">@count</span>
+            </button>
+        }
+        <button class="order-pipeline-step @(StatusFilter == string.Empty ? "active" : "")"
+                @onclick="ShowAllOrders">
+            <span class="ops-icon">🔢</span>
+            <span class="ops-label">All</span>
+            <span class="ops-count">@Report.TotalOrders</span>
+        </button>
+    </div>
+
+    <!-- ── FILTERS ── -->
+    <div class="admin-filters" style="margin-top:1rem">
+        <input class="admin-search" type="search"
+               placeholder="Search order # or email…"
+               @bind="SearchQuery" @bind:event="oninput" />
+        <input class="admin-search" type="date" style="max-width:160px"
+               @bind="DateFrom" />
+        <input class="admin-search" type="date" style="max-width:160px"
+               @bind="DateTo" />
+        <button class="btn btn-outline" style="font-size:.65rem;padding:.6rem 1rem"
+                @onclick="ApplyFilters">Apply</button>
+        <button class="btn btn-outline" style="font-size:.65rem;padding:.6rem 1rem"
+                @onclick="ClearFilters">Clear</button>
+    </div>
+}
+
+@if (Loading)
+{
+    <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+}
+else if (Report != null)
+{
+    <div class="admin-table-wrap" style="margin-top:1rem">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in Report.Orders)
+                {
+                    <tr>
+                        <td>
+                            <div class="admin-order-num">@o.OrderNumber</div>
+                            @if (!string.IsNullOrEmpty(o.PromoCode))
+                            {
+                                <div style="font-size:.6rem;color:var(--gold)">🏷 @o.PromoCode</div>
+                            }
+                        </td>
+                        <td>
+                            <div style="font-size:.82rem;font-weight:500">@o.CustomerEmail</div>
+                            <div style="font-size:.65rem;color:var(--warm-gray)">
+                                @o.ShipCity, @o.ShipCountry
+                            </div>
+                        </td>
+                        <td>
+                            <div style="font-size:.78rem">@o.Items.Count item@(o.Items.Count == 1 ? "" : "s")</div>
+                            @if (o.Items.Any())
+                            {
+                                <div style="font-size:.65rem;color:var(--warm-gray)">
+                                    @o.Items.First().ProductName@(o.Items.Count > 1 ? $" +{o.Items.Count - 1}" : "")
+                                </div>
+                            }
+                        </td>
+                        <td>
+                            <div class="admin-price">£@o.Total.ToString("N2")</div>
+                            @if (o.Discount > 0)
+                            {
+                                <div style="font-size:.65rem;color:#22c55e">-£@o.Discount.ToString("N2")</div>
+                            }
+                        </td>
+                        <td><span class="order-status-chip @o.Status.ToLower()">@o.Status</span></td>
+                        <td style="font-size:.72rem;color:var(--warm-gray)">
+                            @o.CreatedAt.ToString("dd MMM yyyy")<br />
+                            <span style="font-size:.62rem">@o.CreatedAt.ToString("HH:mm")</span>
+                        </td>
+                        <td>
+                            <a href="/admin/orders/edit/@o.Id" class="admin-action-btn">View / Edit</a>
+                        </td>
+                    </tr>
+                }
+                @if (!Report.Orders.Any())
+                {
+                    <tr><td colspan="7" class="admin-empty">No orders found.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    bool Loading = true;
+    OrdersReportResponse? Report;
+    string StatusFilter = "";
+    string SearchQuery  = "";
+    DateTime? DateFrom;
+    DateTime? DateTo;
+
+    record StatusDef(string icon);
+    Dictionary<string, StatusDef> Statuses = new()
+    {
+        ["Pending"]        = new("⏳"),
+        ["PaymentReceived"]= new("💳"),
+        ["Processing"]     = new("⚙️"),
+        ["Shipped"]        = new("🚚"),
+        ["Delivered"]      = new("✅"),
+        ["Cancelled"]      = new("❌"),
+        ["Refunded"]       = new("↩️"),
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadOrders();
+
+    async Task LoadOrders()
+    {
+        Loading = true;
+        try { Report = await Api.GetAdminOrdersAsync(StatusFilter, SearchQuery, DateFrom, DateTo); }
+        catch { }
+        finally { Loading = false; }
+    }
+
+    async Task ShowAllOrders()          { StatusFilter = string.Empty; await LoadOrders(); }
+    async Task FilterByStatus(string s) { StatusFilter = s; await LoadOrders(); }
+    async Task ApplyFilters()           => await LoadOrders();
+
+    async Task ClearFilters()
+    {
+        StatusFilter = ""; SearchQuery = ""; DateFrom = null; DateTo = null;
+        await LoadOrders();
+    }
+}
