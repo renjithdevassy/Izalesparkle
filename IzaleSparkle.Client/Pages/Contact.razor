@@ -1,7 +1,12 @@
 @page "/contact"
 @inject IApiClient Api
 
-<PageTitle>Contact — Izale Sparkle</PageTitle>
+<PageTitle>Contact Us — Get in Touch | Izale Sparkle</PageTitle>
+
+<SeoMeta 
+    Title="Contact Us | Izale Sparkle - Fine Jewellery UK"
+    Description="Get in touch with Izale Sparkle. Contact us for enquiries, bespoke consultations, order queries, or returns. We respond within one business day."
+/>
 
 <!-- HERO -->
 <div class="contact-hero">
@@ -20,28 +25,11 @@
     <!-- INFO PANEL -->
     <div class="ci-panel">
         <div class="ci-block">
-            <div class="ci-label">Visit Us</div>
-            <div class="ci-title">Our Showroom</div>
-            <div class="ci-text">24 Hatton Garden<br />London EC1N 8DB<br />United Kingdom</div>
-        </div>
-        <div class="ci-block">
             <div class="ci-label">Get in Touch</div>
             <div class="ci-title">Contact Details</div>
             <div class="ci-text">
-                Phone: <a href="tel:+442071234567" style="color:var(--gold)">+44 20 7123 4567</a><br />
-                Email: <a href="mailto:hello@izalesparkle.com" style="color:var(--gold)">hello@izalesparkle.com</a><br />
-                Bespoke: <a href="mailto:bespoke@izalesparkle.com" style="color:var(--gold)">bespoke@izalesparkle.com</a>
-            </div>
-        </div>
-        <div class="ci-block">
-            <div class="ci-label">Opening Hours</div>
-            <div class="ci-title">Visit Us</div>
-            <div class="hours-grid">
-                @foreach (var h in Hours)
-                {
-                    <div class="hours-day">@h.Day</div>
-                    <div class="hours-time">@h.Time</div>
-                }
+                Phone: <a href="tel:+447434744854" style="color:var(--gold)">+44 74 3474 4854</a><br />
+                Email: <a href="mailto:izalesparkle@gmail.com" style="color:var(--gold)">izalesparkle@gmail.com</a><br />
             </div>
         </div>
         <div class="ci-block" style="border-bottom:none">
@@ -130,32 +118,11 @@
     </div>
 </div>
 
-<!-- MAP SECTION -->
-<div class="map-section">
-    <div class="map-bg"></div>
-    <div class="map-pin-wrap">
-        <div class="map-pin-icon">📍</div>
-        <div class="map-pin-name">Izale Sparkle</div>
-        <div class="map-pin-addr">24 Hatton Garden, London EC1N 8DB</div>
-    </div>
-</div>
-
 @code {
     string FirstName = "", LastName = "", Email = "", Phone = "", Message = "";
     string EnquiryType = "General Enquiry";
     bool Submitted = false;
     bool ShowErrors = false;
-
-    record HourItem(string Day, string Time);
-
-    List<HourItem> Hours = new()
-    {
-        new("Monday – Friday", "10:00 – 18:00"),
-        new("Saturday",        "10:00 – 17:00"),
-        new("Sunday",          "By appointment"),
-        new("Bank Holidays",   "Closed"),
-    };
-
     bool Submitting = false;
 
     async Task SubmitForm()

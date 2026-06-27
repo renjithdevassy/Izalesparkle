@@ -12,6 +12,28 @@
         <h2 class="success-title">Order Confirmed!</h2>
         <p class="success-sub">Your sparkle is on its way. Check your email for confirmation.</p>
         <p class="success-order">Order @OrderNumber</p>
+
+        <div class="success-details">
+            <div class="detail-row">
+                <span class="detail-label">Shipping Method</span>
+                <span class="detail-value">@ConfirmedShippingMethod</span>
+            </div>
+            @if (ConfirmedShippingCost > 0)
+            {
+                <div class="detail-row">
+                    <span class="detail-label">Shipping Cost</span>
+                    <span class="detail-value">£@ConfirmedShippingCost.ToString("N2")</span>
+                </div>
+            }
+            else
+            {
+                <div class="detail-row">
+                    <span class="detail-label">Shipping Cost</span>
+                    <span class="detail-value free">FREE</span>
+                </div>
+            }
+        </div>
+
         <a href="/" class="btn btn-dark" style="margin-top:2rem">Continue Shopping ✦</a>
     </div>
 }
@@ -26,12 +48,12 @@ else
             <span class="step-line"></span>
             <span class="cstep">2 Shipping</span>
         </div>
-        <span class="secure-badge">🔒 SSL Secured</span>
+        @* <span class="secure-badge">🔒 SSL Secured</span> *@
     </nav>
 
     <div class="checkout-layout">
-        <!-- FORM -->
-        <div class="checkout-form-col">
+        <!-- ORDER SUMMARY (top on mobile) -->
+        <div class="checkout-summary-col checkout-summary-top-mobile">
 
             <!-- CONTACT -->
             <div class="co-section">
@@ -71,10 +93,10 @@ else
                 <h3 class="co-section-title">Shipping Method</h3>
                 @foreach (var s in ShippingOptions)
                 {
-                    <div class="radio-opt @(SelectedShipping == s.Name ? "sel" : "")" @onclick="() => { SelectedShipping = s.Name; Cart.SetShipping(s.Cost); }">
+                    <div class="radio-opt @(SelectedShipping == s.Name ? "sel" : "")" @onclick="() => SelectShipping(s.Name, s.Cost)">
                         <div class="r-dot @(SelectedShipping == s.Name ? "checked" : "")"></div>
                         <div class="r-main"><div class="r-title">@s.Name</div><div class="r-sub">@s.Desc</div></div>
-                        <span class="r-price">@(s.Cost == 0 ? "Free" : "£" + s.Cost)</span>
+                        <span class="r-price">£@s.Cost.ToString("F2")</span>
                     </div>
                 }
             </div>
@@ -85,17 +107,14 @@ else
             <div class="co-section">
                 <h3 class="co-section-title">Payment</h3>
                 <div class="payment-notice">
-                    <div class="payment-notice-icon">💷</div>
+                    <div class="payment-notice-icon">🏦</div>
                     <div>
-                        <div class="payment-notice-title">Payment on Arrangement</div>
+                        <div class="payment-notice-title">Bank Transfer</div>
                         <div class="payment-notice-body">
-                            We will contact you after your order to arrange payment.
-                            We accept bank transfer, cash on collection, and other methods agreed directly with us.
+                            Please transfer the total amount to our bank account. Details will be sent with your order confirmation.
                         </div>
                     </div>
                 </div>
-
-                <hr class="form-divider" />
 
                 <div class="f-row full"><div class="f-field"><label>Gift Message / Engraving (optional)</label><input type="text" @bind="GiftMessage" placeholder="e.g. 'Where every look sparkles ✦'" /></div></div>
 
@@ -105,7 +124,7 @@ else
                     <div class="chk-box @(TermsAccepted ? "chk-box-checked" : "")">
                         @if (TermsAccepted) { <span style="color:white;font-size:.7rem;line-height:1">✓</span> }
                     </div>
-                    <span>I agree to Izale Sparkle's Terms &amp; Conditions and Privacy Policy. I confirm I am over 18.</span>
+                    <span>I agree to Izale Sparkle's <a href="/terms" class="inline-link">Terms &amp; Conditions</a> and Privacy Policy. I confirm I am over 18.</span>
                 </div>
 
                 @if (!string.IsNullOrEmpty(FormError))
@@ -113,26 +132,25 @@ else
                     <div class="form-error">@FormError</div>
                 }
 
-                <button class="submit-btn" @onclick="PlaceOrder">
-                    Complete Purchase · £@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N2")) ✦
+                <button class="submit-btn" @onclick="PlaceOrder" disabled="@Submitting">
+                    @(Submitting ? "Placing Order…" : $"Place Order — £{(Cart.Total - (PromoApplied ? DiscountAmt : 0)):N2}")
                 </button>
-                <p class="form-note">🔒 SSL Secured · All orders fully insured · Free 30-day returns ✦</p>
+                <p class="form-note">🔒 Secured · Insured · 30-day returns</p>
             </div>
         </div>
 
         <!-- ORDER SUMMARY -->
-        <div class="checkout-summary-col">
+        <div class="checkout-summary-col checkout-summary-sidebar">
 
-            <!-- Mobile: collapsible toggle -->
             <div class="checkout-summary-toggle @(SummaryOpen ? "open" : "")"
                  @onclick="() => SummaryOpen = !SummaryOpen">
-                <span>Order Summary · £@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N0"))</span>
+                <span>Order Summary · £@((Cart.Total - (PromoApplied ? DiscountAmt : 0)).ToString("N2"))</span>
                 <span class="toggle-chevron">▼</span>
             </div>
 
             <div class="checkout-summary-collapsible @(SummaryOpen ? "open" : "")">
 
-            <div class="cos-title">✦ Your Sparkle Order ✦</div>
+            <div class="cos-title">Order Summary</div>
 
             @if (Cart.IsEmpty)
             {
@@ -143,27 +161,22 @@ else
                 @foreach (var item in Cart.Items)
                 {
                     <div class="cos-item">
-                        <div class="cos-item-img-wrap">
-                            <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cos-item-img" />
-                            <div class="cos-img-overlay"></div>
-                            @if (!string.IsNullOrEmpty(item.Product.Badge))
-                            {
-                                <div class="cos-item-badge">@(item.Product.Badge == "new" ? "New In" : item.Product.Badge == "sale" ? "Sale" : "")</div>
-                            }
-                            <div class="cos-item-qty-badge">×@item.Quantity</div>
-                        </div>
-                        <div class="cos-item-row">
-                            <div>
-                                <div class="cos-item-name">@item.Product.Name</div>
-                                <div class="cos-item-meta">@item.SelectedMetal</div>
+                        <div class="cos-item-compact">
+                            <div class="cos-item-img-wrap">
+                                <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cos-item-img" />
+                                <div class="cos-item-qty-badge">@item.Quantity</div>
                             </div>
-                            <div class="cos-item-price">£@item.LineTotal.ToString("N0")</div>
-                        </div>
-                        <div class="cos-item-ctrl">
-                            <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity - 1)">−</button>
-                            <span class="q-num">@item.Quantity</span>
-                            <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity + 1)">+</button>
-                            <button class="cos-remove" @onclick="() => Cart.RemoveItem(item.Product.Id)">Remove</button>
+                            <div class="cos-item-info">
+                                <div class="cos-item-name">@item.Product.Name</div>
+                                <div class="cos-item-meta">@item.Product.Material</div>
+                                <div class="cos-item-ctrl">
+                                    <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity - 1)">−</button>
+                                    <span class="q-num">@item.Quantity</span>
+                                    <button class="q-btn" @onclick="() => Cart.UpdateQuantity(item.Product.Id, item.Quantity + 1)">+</button>
+                                    <button class="cos-remove" @onclick="() => Cart.RemoveItem(item.Product.Id)">Remove</button>
+                                </div>
+                            </div>
+                            <div class="cos-item-price">£@item.LineTotal.ToString("N2")</div>
                         </div>
                     </div>
                 }
@@ -183,12 +196,12 @@ else
             </div>
 
             <div class="cos-totals">
-                <div class="tot-row"><span>Subtotal</span><span>£@Cart.Subtotal.ToString("N0")</span></div>
+                <div class="tot-row"><span>Subtotal</span><span>£@Cart.Subtotal.ToString("N2")</span></div>
                 @if (PromoApplied)
                 {
                     <div class="tot-row discount"><span>Discount @(string.IsNullOrEmpty(PromoCode) ? "" : $"({PromoCode.ToUpper()})")</span><span>−£@DiscountAmt.ToString("N2")</span></div>
                 }
-                <div class="tot-row"><span>Shipping</span><span>@(Cart.Shipping == 0 ? "Free" : "£" + Cart.Shipping)</span></div>
+                <div class="tot-row"><span>Shipping</span><span>£@Cart.Shipping.ToString("F2")</span></div>
                 @if (Cart.Vat > 0)
                 {
                     <div class="tot-row"><span>VAT (20% on applicable items)</span><span>£@Cart.Vat.ToString("N2")</span></div>
@@ -200,10 +213,9 @@ else
             </div>
 
             <div class="trust-badges">
-                <div class="trust-b"><span>🛡️</span>Secure</div>
-                <div class="trust-b"><span>✦</span>Certified</div>
-                <div class="trust-b"><span>🔁</span>Returns</div>
-                <div class="trust-b"><span>🚚</span>Insured</div>
+                <div class="trust-b">SSL Secured</div>
+                <div class="trust-b">30-Day Returns</div>
+                <div class="trust-b">Fully Insured</div>
             </div>
 
             </div><!-- end collapsible -->
@@ -217,24 +229,55 @@ else
     string Address1 = "", Address2 = "", City = "", Postcode = "", Country = "United Kingdom";
     string GiftMessage = "";
     bool MarketingOpt = false, TermsAccepted = false;
-    string SelectedShipping = "Standard Delivery";
+    string SelectedShipping = "Collection";
     string PromoCode = "", PromoMessage = "";
     bool PromoApplied = false;
     decimal DiscountAmt = 0;
     bool OrderPlaced = false;
     string FormError = "";
     string OrderNumber = "";
+    string ConfirmedShippingMethod = "";
+    decimal ConfirmedShippingCost = 0;
     bool SummaryOpen = false; // mobile collapsible — closed by default
 
     record ShippingOption(string Name, string Desc, decimal Cost);
     record PaymentMethod(string Name, string Desc, string Icon);
 
-    List<ShippingOption> ShippingOptions = new()
+    List<ShippingOption> GetShippingOptions() => new()
     {
-        new("Standard Delivery",  "3–5 business days · Tracked & Insured", 0),
-        new("Express Delivery",   "1–2 business days · White-glove packaging", 12),
-        new("Same Day Courier",   "London postcodes only · Signature required", 28),
+        new("Collection",         "Pick up from our store", 0),
+        new("Standard Delivery",  "3–5 business days", Cart.Subtotal >= 30 ? 0 : 1.99m),
+        new("Express Delivery",   "1–2 business days", 4.99m),
     };
+
+    List<ShippingOption> ShippingOptions => GetShippingOptions();
+
+    protected override void OnInitialized()
+    {
+        Cart.OnChange += OnCartChanged;
+        var options = GetShippingOptions();
+        var selected = options.FirstOrDefault(o => o.Name == SelectedShipping);
+        if (selected != null)
+        {
+            Cart.SetShipping(selected.Cost, notify: false);
+        }
+    }
+
+    void OnCartChanged()
+    {
+        var options = GetShippingOptions();
+        var selected = options.FirstOrDefault(o => o.Name == SelectedShipping);
+        if (selected != null)
+        {
+            Cart.SetShipping(selected.Cost, notify: false);
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        Cart.OnChange -= OnCartChanged;
+    }
 
     List<PaymentMethod> PaymentMethods = new()
     {
@@ -242,6 +285,16 @@ else
         new("PayPal",              "Secure one-click checkout",  "🅿"),
         new("Apple Pay",           "Touch ID payment",           "🍎"),
     };
+
+    void SelectShipping(string name, decimal cost)
+    {
+        SelectedShipping = name;
+        using (Cart.SuppressChangeEvent())
+        {
+            Cart.SetShipping(cost, notify: false);
+        }
+        StateHasChanged();
+    }
 
     async Task ApplyPromo()
     {
@@ -299,7 +352,7 @@ else
                 GiftMessage:  GiftMessage,
                 Items:        Cart.Items.Select(i =>
                     new IzaleSparkle.Contracts.Requests.OrderItemRequest(
-                        i.Product.Id, i.Quantity, i.SelectedMetal, i.SelectedSize))
+                        i.Product.Id, i.Quantity, i.SelectedMetal ?? "YellowGold18K", i.SelectedSize))
                     .ToList()
             );
 
@@ -307,6 +360,8 @@ else
             if (result?.Success == true && result.Data != null)
             {
                 OrderNumber = result.Data.OrderNumber;
+                ConfirmedShippingMethod = SelectedShipping;
+                ConfirmedShippingCost = Cart.Shipping;
                 OrderPlaced = true;
                 Cart.Clear();
             }
@@ -317,7 +372,9 @@ else
         }
         catch (Exception ex)
         {
-            FormError = $"Could not place order: {ex.Message}. Please try again or contact us.";
+            FormError = ex is TaskCanceledException 
+                ? "Request timed out. Please try again." 
+                : $"Could not place order: {ex.Message}. Please try again or contact us.";
         }
         finally { Submitting = false; }
     }

@@ -32,26 +32,120 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
 
         var invoiceFilename = $"Izale-Sparkle-Invoice-{data.OrderNumber}.pdf";
 
-        // 1. Send confirmation + invoice to customer
+        // Send confirmation + invoice to customer only.
+        // Admin notifications are sent separately via SendAdminOrderNotificationAsync
+        // (which fans out to every configured admin address).
         await SendAsync(data.CustomerEmail, data.CustomerName, subject, html,
             ct, pdfBytes, invoiceFilename);
         log.LogInformation("[Email] Order confirmation sent → {Email} | {OrderNumber}",
             data.CustomerEmail, data.OrderNumber);
-
-        // 2. Send internal order details to admin (replaces WhatsApp)
-        var adminEmail = config["Email:AdminAddress"];
-        if (!string.IsNullOrEmpty(adminEmail))
-        {
-            var adminSubject = $"[NEW ORDER] {data.OrderNumber} — £{data.Total:N2} — {data.CustomerName}";
-            var adminHtml    = BuildAdminOrderHtml(data);
-            await SendAsync(adminEmail, "Izale Sparkle Admin", adminSubject,
-                adminHtml, ct, pdfBytes, invoiceFilename);
-            log.LogInformation("[Email] Admin order notification sent → {Admin} | {OrderNumber}",
-                adminEmail, data.OrderNumber);
-        }
     }
 
+    // ── HTML BUILDERS ───────────────────────────────────────────────
+    static string BuildOrderConfirmationHtml(OrderEmailData data)
+    {
+        var itemRows = string.Join("", data.Items.Select(i =>
+            $"<tr><td style='padding:8px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'>{System.Net.WebUtility.HtmlEncode(i.Name)}<br/><small style='color:#7A6E5F'>{System.Net.WebUtility.HtmlEncode(i.Material)} · Qty {i.Qty}</small></td>" +
+            $"<td style='padding:8px 0;border-bottom:1px solid #f0ead8;text-align:right;color:#C8973A'>£{i.LineTotal:N2}</td></tr>"));
 
+        var discountRow = data.Discount > 0
+            ? $"<tr><td style='color:#16a34a'>Discount ({System.Net.WebUtility.HtmlEncode(data.PromoCode ?? "")})</td><td style='text-align:right;color:#16a34a'>−£{data.Discount:N2}</td></tr>"
+            : "";
+
+        var addrHtml = string.Join("<br/>", data.ShippingAddress
+            .Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(System.Net.WebUtility.HtmlEncode));
+
+        return $"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/></head>
+<body style="margin:0;padding:0;background:#f5f0e1;font-family:'Georgia',serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:30px 20px">
+<tr><td align="center">
+<table width="600" style="background:#fff;max-width:600px;width:100%">
+  <tr><td style="background:#1C1A16;padding:28px 40px;text-align:center">
+    <h1 style="margin:0;color:#C8973A;font-weight:400;font-size:24px;letter-spacing:.25em">Izale ✦ Sparkle</h1>
+  </td></tr>
+  <tr><td style="background:#C8973A;padding:20px 40px;text-align:center">
+    <span style="font-size:36px">✓</span>
+    <h2 style="margin:4px 0 0;color:#1C1A16;font-weight:400;font-size:18px">Thank You For Your Order!</h2>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="color:#7A6E5F;font-size:14px">Dear {System.Net.WebUtility.HtmlEncode(data.CustomerName)},</p>
+    <p style="color:#1C1A16;font-size:15px;line-height:1.7">Your order has been confirmed and we will notify you when it ships. A PDF invoice is attached to this email.</p>
+    <div style="background:#faf7ee;border:1px solid #e8dfc4;padding:14px 18px;margin:20px 0">
+      <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#C8973A;margin-bottom:4px">Order Number</div>
+      <div style="font-size:18px;color:#1C1A16;letter-spacing:.1em">{data.OrderNumber}</div>
+    </div>
+    <table width="100%" style="margin:20px 0">{itemRows}</table>
+    <table width="100%" style="font-size:14px;border-top:1px solid #e8dfc4;padding-top:12px">
+      <tr><td style="color:#7A6E5F">Subtotal</td><td style="text-align:right">£{data.Subtotal:N2}</td></tr>
+      {discountRow}
+      <tr><td style="color:#7A6E5F">Shipping ({System.Net.WebUtility.HtmlEncode(data.ShippingTier)})</td><td style="text-align:right">{(data.Shipping == 0 ? "<span style='color:#16a34a'>FREE</span>" : $"£{data.Shipping:N2}")}</td></tr>
+      {(data.Vat > 0 ? $"<tr><td style='color:#7A6E5F'>VAT (20%)</td><td style='text-align:right'>£{data.Vat:N2}</td></tr>" : "")}
+      <tr style="border-top:2px solid #C8973A"><td style="padding-top:8px"><strong>Total</strong></td><td style="text-align:right;padding-top:8px"><strong style="font-size:16px;color:#C8973A">£{data.Total:N2}</strong></td></tr>
+    </table>
+    <hr style="border:none;border-top:1px solid #e8dfc4;margin:20px 0"/>
+    <p style="margin:0 0 4px;font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Delivering To</p>
+    <p style="margin:0;color:#1C1A16;line-height:1.7">{addrHtml}</p>
+    <p style="font-style:italic;color:#C8973A;font-size:15px;margin-top:24px">Where Every Look Sparkles. ✦</p>
+  </td></tr>
+  <tr><td style="background:#1C1A16;padding:20px 40px;text-align:center">
+    <p style="margin:0;color:rgba(245,240,225,.3);font-size:11px">© 2024 Izale Sparkle · 45 Ryecroft, Haywards Heath, RH16 4NW
+  </td></tr>
+</table></td></tr></table>
+</body></html>
+""";
+    }
+
+    static string BuildAdminOrderHtml(OrderEmailData data)
+    {
+        var itemRows = string.Join("", data.Items.Select(i =>
+            $"<tr><td style='padding:6px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'><strong>{System.Net.WebUtility.HtmlEncode(i.Name)}</strong><br/><small style='color:#7A6E5F'>{System.Net.WebUtility.HtmlEncode(i.Material)} · Qty {i.Qty}</small></td>" +
+            $"<td style='padding:6px 0;border-bottom:1px solid #f0ead8;text-align:right;color:#C8973A;font-family:Georgia,serif'>£{i.LineTotal:N2}</td></tr>"));
+
+        var discountRow = data.Discount > 0
+            ? $"<tr><td style='color:#16a34a'>Discount ({System.Net.WebUtility.HtmlEncode(data.PromoCode ?? "")})</td><td style='text-align:right;color:#16a34a'>−£{data.Discount:N2}</td></tr>"
+            : "";
+
+        var addrHtml = string.Join("<br/>", data.ShippingAddress
+            .Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+            .Select(System.Net.WebUtility.HtmlEncode));
+
+        return $"""
+<div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;background:#FAF7EE;padding:24px">
+  <div style="background:#1C1A16;padding:16px 24px;margin-bottom:0">
+    <span style="color:#C8973A;font-size:18px;font-family:Georgia,serif">Izale ✦ Sparkle</span>
+    <span style="float:right;background:#C8973A;color:#1C1A16;padding:4px 12px;font-size:12px;font-weight:bold">NEW ORDER</span>
+  </div>
+  <div style="background:white;padding:24px;border:1px solid #e8dfc4">
+    <table width="100%" style="margin-bottom:16px">
+      <tr>
+        <td><span style="font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Order Number</span><br/><strong style="font-size:16px">{data.OrderNumber}</strong></td>
+        <td style="text-align:right"><span style="font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Total</span><br/><strong style="font-size:20px;color:#C8973A;font-family:Georgia,serif">£{data.Total:N2}</strong></td>
+      </tr>
+    </table>
+    <hr style="border:none;border-top:1px solid #e8dfc4;margin:12px 0"/>
+    <p style="margin:0 0 4px;font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Customer</p>
+    <p style="margin:0 0 16px;color:#1C1A16"><strong>{System.Net.WebUtility.HtmlEncode(data.CustomerName)}</strong> · {System.Net.WebUtility.HtmlEncode(data.CustomerEmail)}</p>
+    <p style="margin:0 0 4px;font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Items to Pack</p>
+    <table width="100%" style="margin-bottom:16px">{itemRows}</table>
+    <table width="100%" style="font-size:13px;margin-bottom:16px">
+      <tr><td style="color:#7A6E5F">Subtotal</td><td style="text-align:right">£{data.Subtotal:N2}</td></tr>
+      {discountRow}
+      <tr><td style="color:#7A6E5F">Shipping ({System.Net.WebUtility.HtmlEncode(data.ShippingTier)})</td><td style="text-align:right">{(data.Shipping == 0 ? "<span style='color:#16a34a'>FREE</span>" : $"£{data.Shipping:N2}")}</td></tr>
+      {(data.Vat > 0 ? $"<tr><td style='color:#7A6E5F'>VAT (20%)</td><td style='text-align:right'>£{data.Vat:N2}</td></tr>" : "")}
+      <tr style="border-top:2px solid #C8973A"><td style="padding-top:8px"><strong>Total</strong></td><td style="text-align:right;padding-top:8px"><strong style="font-size:16px;color:#C8973A">£{data.Total:N2}</strong></td></tr>
+    </table>
+    <hr style="border:none;border-top:1px solid #e8dfc4;margin:12px 0"/>
+    <p style="margin:0 0 4px;font-size:11px;color:#C8973A;letter-spacing:2px;text-transform:uppercase">Deliver To</p>
+    <p style="margin:0;color:#1C1A16;line-height:1.8">{addrHtml}</p>
+    <p style="margin:16px 0 0;background:#fff8e6;border:1px solid #e8dfc4;padding:10px 14px;font-size:12px;color:#7A6E5F">
+      ✅ Payment will be collected separately. This order needs to be packed and dispatched.
+    </p>
+  </div>
+</div>
+""";
+    }
 
     // ── ORDER STATUS UPDATE ───────────────────────────────────────
     public async Task SendOrderStatusUpdateAsync(
@@ -115,7 +209,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
     <p style="font-style:italic;color:#C8973A;font-size:15px;margin-top:24px">Where Every Look Sparkles. ✦</p>
   </td></tr>
   <tr><td style="background:#1C1A16;padding:20px 40px;text-align:center">
-    <p style="margin:0;color:rgba(245,240,225,.3);font-size:11px">© 2024 Izale Sparkle · 24 Hatton Garden, London EC1N 8DB</p>
+    <p style="margin:0;color:rgba(245,240,225,.3);font-size:11px">© 2024 Izale Sparkle · 45 Ryecroft, Haywards Heath, RH16 4NW
   </td></tr>
 </table></td></tr></table>
 </body></html>
@@ -130,8 +224,14 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
     // ── ADMIN ORDER NOTIFICATION ──────────────────────────────────
     public async Task SendAdminOrderNotificationAsync(OrderEmailData data, CancellationToken ct = default)
     {
-        var adminEmail = config["Email:AdminAddress"] ?? config["Email:From"] ?? "";
-        if (string.IsNullOrEmpty(adminEmail)) return;
+        var recipients = GetAdminRecipients();
+        if (recipients.Count == 0) return;
+
+        // Attach the same PDF invoice the customer receives so admins can print/pack.
+        byte[]? pdfBytes = null;
+        try { pdfBytes = InvoiceGenerator.Generate(data); }
+        catch (Exception ex) { log.LogError(ex, "[Invoice] PDF generation failed for admin notification {OrderNumber}", data.OrderNumber); }
+        var invoiceFilename = $"Izale-Sparkle-Invoice-{data.OrderNumber}.pdf";
 
         var subject = $"🔔 New Order — {data.OrderNumber} | £{data.Total:N2}";
 
@@ -169,7 +269,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
       <tr><td style="color:#7A6E5F">Subtotal</td><td style="text-align:right">£{data.Subtotal:N2}</td></tr>
       {discountRow}
       <tr><td style="color:#7A6E5F">Shipping ({System.Net.WebUtility.HtmlEncode(data.ShippingTier)})</td><td style="text-align:right">{(data.Shipping == 0 ? "<span style='color:#16a34a'>FREE</span>" : $"£{data.Shipping:N2}")}</td></tr>
-      <tr><td style="color:#7A6E5F">VAT (20%)</td><td style="text-align:right">£{data.Vat:N2}</td></tr>
+      {(data.Vat > 0 ? $"<tr><td style='color:#7A6E5F'>VAT (20%)</td><td style='text-align:right'>£{data.Vat:N2}</td></tr>" : "")}
       <tr style="border-top:2px solid #C8973A"><td style="padding-top:8px"><strong>Total</strong></td><td style="text-align:right;padding-top:8px"><strong style="font-size:16px;color:#C8973A">£{data.Total:N2}</strong></td></tr>
     </table>
     <hr style="border:none;border-top:1px solid #e8dfc4;margin:12px 0"/>
@@ -182,8 +282,9 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
 </div>
 """;
 
-        await SendAsync(adminEmail, "Izale Sparkle Admin", subject, html, ct);
-        log.LogInformation("[Email] Admin order notification sent for {OrderNumber}", data.OrderNumber);
+        await SendAsync(recipients, subject, html, ct, pdfBytes, invoiceFilename);
+        log.LogInformation("[Email] Admin order notification sent for {OrderNumber} → {Count} recipient(s)",
+            data.OrderNumber, recipients.Count);
     }
 
     // ── CONTACT FORM ──────────────────────────────────────────────
@@ -200,9 +301,9 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
             </div>
             """;
 
-        var adminEmail = config["Email:AdminAddress"] ?? config["Email:From"] ?? "";
-        if (!string.IsNullOrEmpty(adminEmail))
-            await SendAsync(adminEmail, "Izale Sparkle Admin", $"Contact: {subject}", html, ct);
+        var recipients = GetAdminRecipients();
+        if (recipients.Count > 0)
+            await SendAsync(recipients, $"Contact: {subject}", html, ct);
     }
 
     // ── NEWSLETTER WELCOME ────────────────────────────────────────
@@ -231,16 +332,41 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
         return Task.FromResult(bytes);
     }
 
+    // ── ADMIN RECIPIENTS ──────────────────────────────────────────
+    /// <summary>
+    /// Resolves the configured admin notification addresses. Supports a single
+    /// address or a comma/semicolon-separated list (e.g. three inboxes).
+    /// </summary>
+    List<MailboxAddress> GetAdminRecipients()
+    {
+        var raw = config["Email:AdminAddress"] ?? config["Email:From"] ?? "";
+        return raw
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(a => new MailboxAddress("Izale Sparkle Admin", a))
+            .ToList();
+    }
+
     // ── CORE SEND ─────────────────────────────────────────────────
-    async Task SendAsync(
+    Task SendAsync(
         string toEmail, string toName, string subject, string htmlBody,
         CancellationToken ct,
         byte[]? attachmentBytes = null, string? attachmentFilename = null)
+        => SendAsync(new[] { new MailboxAddress(toName, toEmail) }, subject, htmlBody,
+            ct, attachmentBytes, attachmentFilename);
+
+    async Task SendAsync(
+        IEnumerable<MailboxAddress> recipients, string subject, string htmlBody,
+        CancellationToken ct,
+        byte[]? attachmentBytes = null, string? attachmentFilename = null)
     {
+        var toList = recipients.ToList();
+        if (toList.Count == 0) return;
+
         var smtpHost = config["Email:SmtpHost"];
         if (string.IsNullOrEmpty(smtpHost))
         {
-            log.LogWarning("[Email] SMTP not configured — skipping send to {Email}", toEmail);
+            log.LogWarning("[Email] SMTP not configured — skipping send to {Email}",
+                string.Join(", ", toList.Select(t => t.Address)));
             return;
         }
 
@@ -252,7 +378,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
 
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(fromName, fromAddr));
-        message.To.Add(new MailboxAddress(toName, toEmail));
+        message.To.AddRange(toList);
         message.Subject = subject;
 
         // Build multipart body when there is an attachment

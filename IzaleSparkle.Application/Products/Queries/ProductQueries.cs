@@ -28,6 +28,9 @@ public sealed class GetProductsQueryHandler(
         var products = await uow.Products.SearchAsync(
             req.Search, req.Category, req.MinPrice, req.MaxPrice, ct);
 
+        // Filter out out-of-stock products
+        products = products.Where(p => p.StockLevel > 0);
+
         // Sort
         products = req.Sort switch
         {
@@ -59,6 +62,10 @@ public sealed class GetProductByIdQueryHandler(
         var product = await uow.Products.GetByIdAsync(req.Id, ct)
             ?? throw new NotFoundException(nameof(Domain.Entities.Product), req.Id);
 
+        // Don't show out-of-stock products to customers
+        if (product.StockLevel <= 0)
+            throw new NotFoundException(nameof(Domain.Entities.Product), req.Id);
+
         return mapper.Map<ProductResponse>(product);
     }
 }
@@ -76,6 +83,8 @@ public sealed class GetFeaturedProductsQueryHandler(
         GetFeaturedProductsQuery req, CancellationToken ct)
     {
         var products = await uow.Products.GetFeaturedAsync(req.Count, ct);
+        // Filter out out-of-stock products
+        products = products.Where(p => p.StockLevel > 0).Take(req.Count);
         return mapper.Map<IEnumerable<ProductSummaryResponse>>(products);
     }
 }
@@ -93,6 +102,8 @@ public sealed class GetRelatedProductsQueryHandler(
         GetRelatedProductsQuery req, CancellationToken ct)
     {
         var products = await uow.Products.GetRelatedAsync(req.ProductId, req.Count, ct);
+        // Filter out out-of-stock products
+        products = products.Where(p => p.StockLevel > 0).Take(req.Count);
         return mapper.Map<IEnumerable<ProductSummaryResponse>>(products);
     }
 }

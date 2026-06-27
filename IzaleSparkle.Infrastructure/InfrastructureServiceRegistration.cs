@@ -26,7 +26,13 @@ public static class InfrastructureServiceRegistration
         services.AddMemoryCache();
         services.AddScoped<ICacheService, MemoryCacheService>();
 
+        // Website visit tracking (admin dashboard "Website Views" counter)
+        services.AddScoped<ISiteAnalytics, SiteAnalytics>();
+
         services.AddScoped<IAuthService, JwtAuthService>();
+
+        // WhatsApp/Meta catalog import — reads products via the Graph API (free reads).
+        services.AddHttpClient<IWhatsAppCatalogService, MetaWhatsAppCatalogService>();
 
         return services;
     }
@@ -62,7 +68,8 @@ public class MemoryCacheService(IMemoryCache cache) : ICacheService
 // JWT types are referenced by full namespace to avoid ambiguity.
 public class JwtAuthService(IConfiguration config) : IAuthService
 {
-    private readonly string _secret        = config["Jwt:Secret"]        ?? "IzaleSparkle-Super-Secret-Key-Must-Be-32!!";
+    private readonly string _secret        = string.IsNullOrWhiteSpace(config["Jwt:Secret"])
+        ? "IzaleSparkle-Super-Secret-Key-Must-Be-32-Chars!!" : config["Jwt:Secret"]!;
     private readonly string _issuer        = config["Jwt:Issuer"]        ?? "IzaleSparkle";
     private readonly string _audience      = config["Jwt:Audience"]      ?? "IzaleSparkleUsers";
     private readonly int    _expiryMinutes = int.TryParse(config["Jwt:ExpiryMinutes"], out var m) ? m : 1440;

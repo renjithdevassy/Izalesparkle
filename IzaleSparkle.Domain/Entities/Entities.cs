@@ -14,13 +14,13 @@ public class Product : BaseEntity
     public string Material    { get; private set; } = string.Empty;
     public Money Price        { get; private set; } = Money.Zero;
     public Money? OldPrice    { get; private set; }
-    public ProductCategory Category { get; private set; }
+    public string Category { get; private set; } = "rings";
     public BadgeType? Badge   { get; private set; }
     public int Stars          { get; private set; } = 5;
     public string ImageUrl    { get; private set; } = string.Empty;
     public bool IsActive      { get; private set; } = true;
-    /// <summary>Whether VAT (20%) applies to this product. Most jewellery is VAT-able in UK.</summary>
-    public bool IsVatApplicable { get; private set; } = true;
+    /// <summary>Whether VAT (20%) applies to this product. Defaults to false (VAT exempt).</summary>
+    public bool IsVatApplicable { get; private set; } = false;
     /// <summary>Internal purchase/cost price — never exposed to customers.</summary>
     public Money? CostPrice      { get; private set; }
     /// <summary>Minimum stock level before reorder alert is triggered.</summary>
@@ -51,10 +51,10 @@ public class Product : BaseEntity
 
     public static Product Create(
         string name, string description, string material,
-        decimal price, ProductCategory category,
+        decimal price, string category,
         string imageUrl, int stars = 5,
         decimal? oldPrice = null, BadgeType? badge = null,
-        decimal? costPrice = null)
+        decimal? costPrice = null, bool isVatApplicable = false)
     {
         var product = new Product
         {
@@ -65,11 +65,11 @@ public class Product : BaseEntity
             Price       = new Money(price),
             OldPrice    = oldPrice.HasValue ? new Money(oldPrice.Value) : null,
             CostPrice   = costPrice.HasValue ? new Money(costPrice.Value) : null,
-            Category    = category,
+            Category    = Entities.Category.ToSlug(category),
             Badge       = badge,
             Stars       = stars,
             ImageUrl    = imageUrl,
-            IsVatApplicable = true,
+            IsVatApplicable = isVatApplicable,
         };
         product.AddDomainEvent(new ProductCreatedEvent(product));
         return product;
@@ -77,6 +77,10 @@ public class Product : BaseEntity
 
     public void AddImage(string url, bool isPrimary = false)
         => _images.Add(new ProductImage { Url = url, IsPrimary = isPrimary, ProductId = Id });
+
+    public void ClearImages() => _images.Clear();
+
+    public void UpdateCategory(string category) => Category = Entities.Category.ToSlug(category);
 
     public void AddStockPurchase(int qty, decimal unitCost, string? supplier, string? reference, DateTime? purchasedOn)
         => _stockPurchases.Add(new StockPurchase
@@ -88,6 +92,15 @@ public class Product : BaseEntity
             Reference    = reference,
             PurchasedOn  = purchasedOn ?? DateTime.UtcNow,
         });
+
+    /// <summary>Reduce stock by the specified quantity when an order is placed.</summary>
+    public void ReduceStock(int qty)
+    {
+        if (qty <= 0) return;
+        if (StockLevel < qty)
+            throw new InvalidOperationException($"Cannot reduce stock by {qty} — only {StockLevel} items available for {Name}");
+        StockLevel -= qty;
+    }
 
     /// <summary>True when an OldPrice (RRP/original price) is set and higher than selling price.</summary>
     public bool IsOnSale  => OldPrice != null && OldPrice.Amount > Price.Amount;
@@ -149,7 +162,7 @@ public class Order : BaseEntity
 
     public Money Subtotal => new(_items.Sum(i => i.LineTotal.Amount));
     public Money? StoredVat   { get; private set; }  // set when order is created
-    public Money Vat      => StoredVat ?? new(Math.Round(Subtotal.Amount * 0.20m, 2));
+    public Money Vat      => StoredVat ?? new Money(0);
     public Money Total    => new(Subtotal.Amount + ShippingCost.Amount + Vat.Amount - Discount.Amount);
 
     protected Order() { }
@@ -336,4 +349,16 @@ public class Category : BaseEntity
     public static string ToSlug(string name) =>
         name.ToLower().Trim().Replace(" ", "-")
             .Replace("'", "").Replace("&", "and");
+}
+
+// ── SITE VISIT ───────────────────────────────────────────────
+/// <summary>
+/// One row per visit to the public website. Used to show a simple
+/// "website views" counter in the admin dashboard. CreatedAt (from
+/// BaseEntity) records the visit time.
+/// </summary>
+public class SiteVisit : BaseEntity
+{
+    /// <summary>Relative path that was visited (e.g. "/", "shop"). Optional.</summary>
+    public string? Path { get; set; }
 }

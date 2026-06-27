@@ -5,8 +5,32 @@
 
 <div class="admin-page-header">
     <h1 class="admin-page-title">Products <span class="admin-count-badge">@ProductList.Count</span></h1>
-    <a href="/admin/products/new" class="btn btn-gold" style="font-size:.68rem">+ New Product</a>
+    <div style="display:flex;gap:.5rem;align-items:center">
+        <button class="btn btn-outline" style="font-size:.68rem" @onclick="() => ShowSyncHelp = !ShowSyncHelp">
+            ⬆ Sync to WhatsApp
+        </button>
+        <a href="/admin/products/new" class="btn btn-gold" style="font-size:.68rem">+ New Product</a>
+    </div>
 </div>
+
+@if (ShowSyncHelp)
+{
+    <div class="admin-filters" style="flex-direction:column;align-items:flex-start;gap:.6rem">
+        <strong>Sync your products to the WhatsApp / Meta catalog</strong>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+            <a href="/feed/products.csv" target="_blank" download class="btn btn-gold" style="font-size:.68rem">
+                ⬇ Download catalog file
+            </a>
+            <span style="font-size:.72rem;color:var(--warm-gray)">products.csv — all active products in Meta's format</span>
+        </div>
+        <ol style="font-size:.74rem;color:var(--warm-gray);margin:0;padding-left:1.1rem;line-height:1.6">
+            <li>Download the file above.</li>
+            <li>In <strong>Commerce Manager → Catalog → Data Sources → Add Items → Upload from file</strong>, upload <code>products.csv</code>.</li>
+            <li>To keep it automatic instead, add this URL as a scheduled <em>Data Feed</em>:
+                <code>http://renjithanoopy-001-site2.stempurl.com/feed/products.csv</code></li>
+        </ol>
+    </div>
+}
 
 <!-- FILTERS -->
 <div class="admin-filters">
@@ -60,16 +84,16 @@ else
                         </td>
                         <td><span class="admin-badge-chip">@p.Category</span></td>
                         <td>
-                            <div class="admin-price">£@p.Price.ToString("N0")</div>
+                            <div class="admin-price">£@p.Price.ToString("N2")</div>
                             @if (p.OldPrice.HasValue)
                             {
-                                <div class="admin-price-old">£@p.OldPrice.Value.ToString("N0")</div>
+                                <div class="admin-price-old">£@p.OldPrice.Value.ToString("N2")</div>
                             }
                         </td>
                         <td>
                             @if (p.CostPrice.HasValue)
                             {
-                                <div style="font-size:.72rem;color:var(--warm-gray)">£@p.CostPrice.Value.ToString("N0") cost</div>
+                                <div style="font-size:.72rem;color:var(--warm-gray)">£@p.CostPrice.Value.ToString("N2") cost</div>
                                 @if (p.MarginPercent.HasValue)
                                 {
                                     <div class="cost-margin-badge @(p.MarginPercent >= 50 ? "good" : p.MarginPercent >= 25 ? "ok" : "low")" style="font-size:.58rem;padding:.15rem .5rem">
@@ -136,6 +160,7 @@ else
 @code {
     bool Loading = true;
     bool Deleting = false;
+    bool ShowSyncHelp = false;
     List<AdminProductResponse> ProductList = new();
     AdminProductResponse? DeleteTarget;
     string SearchQuery = "";

@@ -14,11 +14,12 @@ public class Product
     public List<string> Images { get; set; } = new();
     public string Variant { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public bool IsVatApplicable { get; set; } = true;
+    public bool IsVatApplicable { get; set; } = false;
+    public int StockLevel { get; set; }
 
     public bool IsOnSale => OldPrice.HasValue && OldPrice > Price;
     public int? SavePercent => IsOnSale
-        ? Math.Max(1, (int)Math.Ceiling((1 - Price / OldPrice!.Value) * 100))
+        ? Math.Max(1, (int)Math.Round((1 - Price / OldPrice!.Value) * 100))
         : null;
     public string StarsDisplay => new string('★', Stars) + new string('☆', 5 - Stars);
 }
@@ -27,8 +28,8 @@ public class CartItem
 {
     public Product Product { get; set; } = null!;
     public int Quantity { get; set; } = 1;
-    public string SelectedMetal { get; set; } = "18K White Gold";
     public string? SelectedSize { get; set; }
+    public string? SelectedMetal { get; set; }
 
     public decimal LineTotal => Product.Price * Quantity;
 }

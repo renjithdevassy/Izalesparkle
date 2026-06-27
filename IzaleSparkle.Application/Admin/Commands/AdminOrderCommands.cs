@@ -41,7 +41,7 @@ internal static class OrderAdminMapper
             UnitPrice:   i.UnitPrice.Amount,
             Quantity:    i.Quantity,
             LineTotal:   i.LineTotal.Amount,
-            Metal:       i.Metal.ToString(),
+            Metal:       AdminHelpers.FormatMetal(i.Metal.ToString()),
             Size:        i.Size)).ToList());
 }
 
@@ -77,12 +77,13 @@ public sealed class GetAllOrdersAdminQueryHandler(IUnitOfWork uow)
         var today = DateTime.UtcNow.Date;
 
         return new OrdersReportResponse(
-            TotalOrders:      all.Count,
-            PendingOrders:    all.Count(o => o.Status == OrderStatus.Pending),
-            ProcessingOrders: all.Count(o => o.Status == OrderStatus.Processing),
-            ShippedOrders:    all.Count(o => o.Status == OrderStatus.Shipped),
-            DeliveredOrders:  all.Count(o => o.Status == OrderStatus.Delivered),
-            CancelledOrders:  all.Count(o => o.Status == OrderStatus.Cancelled),
+            TotalOrders:         all.Count,
+            PendingOrders:       all.Count(o => o.Status == OrderStatus.Pending),
+            ProcessingOrders:    all.Count(o => o.Status == OrderStatus.Processing),
+            CollectionReadyOrders: all.Count(o => o.Status == OrderStatus.CollectionReady),
+            ShippedOrders:       all.Count(o => o.Status == OrderStatus.Shipped),
+            DeliveredOrders:     all.Count(o => o.Status == OrderStatus.Delivered),
+            CancelledOrders:     all.Count(o => o.Status == OrderStatus.Cancelled),
             TotalRevenue:     all
                 .Where(o => o.Status != OrderStatus.Cancelled && o.Status != OrderStatus.Refunded)
                 .Sum(o => o.Total.Amount),
@@ -151,7 +152,7 @@ public sealed class UpdateOrderStatusCommandHandler(IUnitOfWork uow, IEmailServi
 
         // Send status update email if status changed
         var newStatus = req.Status;
-        var notifyStatuses = new[] { "PaymentReceived","Processing","Shipped","Delivered","Cancelled","Refunded" };
+        var notifyStatuses = new[] { "PaymentReceived","Processing","CollectionReady","Shipped","Delivered","Cancelled","Refunded" };
         if (Array.IndexOf(notifyStatuses, newStatus) >= 0)
         {
             var customerName = $"{order.ShippingAddress.FirstName} {order.ShippingAddress.LastName}";
@@ -202,7 +203,7 @@ public sealed class ResendInvoiceCommandHandler(IUnitOfWork uow, IEmailService e
             ShippingAddress: $"{order.ShippingAddress.FirstName} {order.ShippingAddress.LastName}\n{order.ShippingAddress.Line1}\n{(string.IsNullOrEmpty(order.ShippingAddress.Line2) ? "" : order.ShippingAddress.Line2 + "\n")}{order.ShippingAddress.City}\n{order.ShippingAddress.Postcode}\n{order.ShippingAddress.Country}",
             ShippingTier:    order.ShippingTier.ToString(),
             Items: order.Items.Select(i => new OrderEmailItem(
-                i.ProductName, i.Metal.ToString(), i.Quantity,
+                i.ProductName, AdminHelpers.FormatMetal(i.Metal.ToString()), i.Quantity,
                 i.UnitPrice.Amount, i.LineTotal.Amount)).ToList());
 
         await email.SendOrderConfirmationAsync(data, ct);
@@ -236,7 +237,7 @@ public sealed class GenerateInvoicePdfQueryHandler(IUnitOfWork uow, IEmailServic
             ShippingAddress: $"{order.ShippingAddress.FirstName} {order.ShippingAddress.LastName}\n{order.ShippingAddress.Line1}\n{(string.IsNullOrEmpty(order.ShippingAddress.Line2) ? "" : order.ShippingAddress.Line2 + "\n")}{order.ShippingAddress.City}\n{order.ShippingAddress.Postcode}\n{order.ShippingAddress.Country}",
             ShippingTier:    order.ShippingTier.ToString(),
             Items: order.Items.Select(i => new OrderEmailItem(
-                i.ProductName, i.Metal.ToString(), i.Quantity,
+                i.ProductName, AdminHelpers.FormatMetal(i.Metal.ToString()), i.Quantity,
                 i.UnitPrice.Amount, i.LineTotal.Amount)).ToList());
 
         var bytes = await email.GenerateInvoicePdfAsync(data, ct);
@@ -338,4 +339,17 @@ public sealed class CancelOrderCommandHandler(IUnitOfWork uow)
             System.Reflection.BindingFlags.NonPublic);
         p?.SetValue(obj, val);
     }
+}
+
+// ── SHARED HELPERS ────────────────────────────────────────────
+internal static class AdminHelpers
+{
+    internal static string FormatMetal(string metalType) => metalType switch
+    {
+        "WhiteGold18K"  => "18K White Gold",
+        "YellowGold18K" => "18K Yellow Gold",
+        "RoseGold18K"   => "18K Rose Gold",
+        "Platinum"      => "Platinum",
+        _               => metalType
+    };
 }

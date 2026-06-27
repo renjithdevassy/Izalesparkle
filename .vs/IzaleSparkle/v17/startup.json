@@ -1,9 +1,0 @@
-{
-  "version": "1.0",
-  "MultiProjectDebugTargets": [
-    {
-      "Name": "IzaleSparkle.Server",
-      "Action": "Start"
-    }
-  ]
-}

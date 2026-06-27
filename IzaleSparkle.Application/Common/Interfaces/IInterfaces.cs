@@ -85,6 +85,16 @@ public record OrderEmailData(
 );
 public record OrderEmailItem(string Name, string Material, int Qty, decimal UnitPrice, decimal LineTotal);
 
+/// <summary>Records and reports public website visits for the admin dashboard.</summary>
+public interface ISiteAnalytics
+{
+    /// <summary>Record a single website visit. Never throws.</summary>
+    Task RecordVisitAsync(string? path, CancellationToken ct = default);
+
+    /// <summary>Total views all-time and today (UTC).</summary>
+    Task<(int Total, int Today)> GetViewCountsAsync(CancellationToken ct = default);
+}
+
 public interface ICacheService
 {
     Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class;
@@ -111,3 +121,20 @@ public interface IWhatsAppService
     Task SendContactNotificationAsync(string fromName, string email, string message, CancellationToken ct = default);
     Task SendLowStockAlertAsync(string productName, int stockLevel, CancellationToken ct = default);
 }
+
+/// <summary>Reads products from the linked WhatsApp/Meta Commerce catalog (Graph API).</summary>
+public interface IWhatsAppCatalogService
+{
+    Task<IReadOnlyList<WhatsAppCatalogItem>> FetchProductsAsync(CancellationToken ct = default);
+}
+
+/// <summary>A single product item read from the Meta/WhatsApp commerce catalog.</summary>
+public record WhatsAppCatalogItem(
+    string  RetailerId,
+    string  Name,
+    string  Description,
+    decimal Price,
+    string? Currency,
+    string  ImageUrl,
+    bool    Available
+);

@@ -46,7 +46,7 @@ public static class InvoiceGenerator
                                 .Text("WHERE EVERY LOOK SPARKLES")
                                 .FontSize(7).FontColor(WarmGray);
                             brand.Item().PaddingTop(4)
-                                .Text("24 Hatton Garden, London EC1N 8DB")
+                                .Text("45 Ryecroft, Haywards Heath, RH16 4NW")
                                 .FontSize(8).FontColor(WarmGray);
                             brand.Item()
                                 .Text("info@izalesparkle.com  ·  izalesparkle.com")
@@ -205,7 +205,8 @@ public static class InvoiceGenerator
                         TotalRow($"Shipping ({d.ShippingTier})",
                             d.Shipping == 0 ? "FREE" : $"£{d.Shipping:N2}");
 
-                        TotalRow("VAT (20%)", $"£{d.Vat:N2}");
+                        if (d.Vat > 0)
+                            TotalRow("VAT (20%)", $"£{d.Vat:N2}");
 
                         totals.Item().Background(Charcoal).Padding(10).Row(r =>
                         {
@@ -243,7 +244,7 @@ public static class InvoiceGenerator
                     footer.Item().PaddingTop(6).Row(row =>
                     {
                         row.RelativeItem()
-                            .Text("Izale Sparkle  ·  24 Hatton Garden, London EC1N 8DB  ·  izalesparkle.com")
+                            .Text("Izale Sparkle  ·  45 Ryecroft, Haywards Heath, RH16 4NW  ·  izalesparkle.com")
                             .FontSize(7.5f).FontColor(WarmGray);
 
                         // CurrentPageNumber() and TotalPages() return void —

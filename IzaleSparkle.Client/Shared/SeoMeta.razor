@@ -1,0 +1,233 @@
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Nav
+
+@if (SiteSchema != null)
+{
+    <script type="application/ld+json">
+        @((MarkupString)SiteSchema)
+    </script>
+}
+
+@if (ProductSchemas.Any())
+{
+    foreach (var schema in ProductSchemas)
+    {
+        <script type="application/ld+json">
+            @((MarkupString)schema)
+        </script>
+    }
+}
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Image { get; set; }
+    [Parameter] public ProductSchemaData? Product { get; set; }
+    [Parameter] public bool IsHomepage { get; set; }
+
+    private string? SiteSchema { get; set; }
+    private List<string> ProductSchemas { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        if (IsHomepage)
+        {
+            SiteSchema = GenerateWebsiteSchema();
+        }
+        else if (!string.IsNullOrEmpty(Title))
+        {
+            SiteSchema = GenerateWebPageSchema();
+        }
+
+        if (Product != null)
+        {
+            ProductSchemas.Add(GenerateProductSchema(Product));
+        }
+    }
+
+    private string GenerateWebsiteSchema()
+    {
+        return $$"""
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "Izale Sparkle",
+            "alternateName": "Indian Jewellery UK, Asian Jewellery UK",
+            "url": "https://izalesparkle.com",
+            "logo": "https://izalesparkle.com/icons/icon-192.svg",
+            "description": "UK-based online store for Indian jewellery including  necklaces",
+            "slogan": "Where Every Look Sparkles",
+            "keywords": "Indian jewellery UK, Asian jewellery UK, bridal jewellery,  necklaces, temple jewellery, South Indian jewellery, wedding jewellery",
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "45 Ryecroft",
+                "addressLocality": "Haywards Heath",
+                "postalCode": "RH16 4NW",
+                "addressCountry": "GB"
+            },
+            "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+447880229307",
+                "contactType": "customer service",
+                "email": "izalesparkle@gmail.com",
+                "availableLanguage": "English"
+            },
+            "areaServed": [
+                {
+                    "@type": "Country",
+                    "name": "United Kingdom"
+                }
+            ],
+            "sameAs": [
+                "https://www.facebook.com/izalesparkle",
+                "https://www.instagram.com/izalesparkle",
+                "https://twitter.com/izalesparkle"
+            ],
+            "priceRange": "££",
+            "currenciesAccepted": "GBP",
+            "paymentAccepted": "Bank Transfer",
+            "shippingInformation": {
+                "@type": "OfferShippingDetails",
+                "shippingRate": {
+                    "@type": "MonetaryAmount",
+                    "value": "1.99",
+                    "currency": "GBP"
+                },
+                "freeShippingThreshold": {
+                    "@type": "MonetaryAmount",
+                    "value": "30",
+                    "currency": "GBP"
+                }
+            }
+        }
+        """;
+    }
+
+    private string GenerateWebPageSchema()
+    {
+        var url = Nav.Uri;
+        return $$"""
+        {
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "name": "{{Title}}",
+            "description": "{{Description ?? "Fine jewellery at Izale Sparkle"}}",
+            "url": "{{url}}",
+            "isPartOf": {
+                "@type": "WebSite",
+                "name": "Izale Sparkle",
+                "url": "https://izalesparkle.com"
+            },
+            "about": {
+                "@type": "Thing",
+                "name": "Indian Jewellery UK",
+                "description": "UK-based online Indian jewellery store. "
+            }
+        }
+        """;
+    }
+
+    private string GenerateProductSchema(ProductSchemaData product)
+    {
+        var price = product.Price.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+        var availability = product.InStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
+        var shippingValue = product.FreeShipping ? "0.00" : "1.99";
+        var sku = product.Sku ?? "IS-" + product.Id;
+        var mpn = product.Mpn ?? "IS-" + product.Id;
+        
+        return $$"""
+        {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "{{EscapeJson(product.Name)}}",
+            "description": "{{EscapeJson(product.Description ?? product.Name)}} - Indian jewellery from UK",
+            "image": "{{product.ImageUrl}}",
+            "sku": "{{sku}}",
+            "mpn": "{{mpn}}",
+            "brand": {
+                "@type": "Brand",
+                "name": "Izale Sparkle",
+                "alternateName": "Indian Jewellery UK"
+            },
+            "manufacturer": {
+                "@type": "Organization",
+                "name": "Izale Sparkle"
+            },
+            "category": "{{product.Category}} - Indian Jewellery",
+            "keywords": "Indian jewellery UK, {{product.Category}}, gold jewellery, wedding jewellery, bridal jewellery",
+            "material": "{{product.Material}}",
+            "offers": {
+                "@type": "Offer",
+                "url": "{{Nav.Uri}}",
+                "priceCurrency": "GBP",
+                "price": "{{price}}",
+                "availability": "{{availability}}",
+                "seller": {
+                    "@type": "Organization",
+                    "name": "Izale Sparkle"
+                },
+                "shippingDetails": {
+                    "@type": "OfferShippingDetails",
+                    "shippingRate": {
+                        "@type": "MonetaryAmount",
+                        "value": "{{shippingValue}}",
+                        "currency": "GBP"
+                    },
+                    "shippingDestination": {
+                        "@type": "DefinedRegion",
+                        "addressCountry": "GB"
+                    },
+                    "deliveryTime": {
+                        "@type": "ShippingDeliveryTimeSpecification",
+                        "handlingTime": {
+                            "@type": "QuantitativeValue",
+                            "minValue": "1",
+                            "maxValue": "2",
+                            "unitCode": "DAY"
+                        },
+                        "transitTime": {
+                            "@type": "QuantitativeValue",
+                            "minValue": "3",
+                            "maxValue": "5",
+                            "unitCode": "DAY"
+                        }
+                    }
+                }
+            },
+            "aggregateRating": {
+                "@type": "AggregateRating",
+                "ratingValue": "{{product.Rating}}",
+                "reviewCount": "{{product.ReviewCount}}"
+            }
+        }
+        """;
+    }
+
+    private static string EscapeJson(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r")
+            .Replace("\t", "\\t");
+    }
+
+    public class ProductSchemaData
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string? Sku { get; set; }
+        public string? Mpn { get; set; }
+        public string ImageUrl { get; set; } = "";
+        public string Material { get; set; } = "";
+        public string Category { get; set; } = "";
+        public decimal Price { get; set; }
+        public bool InStock { get; set; } = true;
+        public bool FreeShipping { get; set; } = false;
+        public decimal Rating { get; set; } = 5;
+        public int ReviewCount { get; set; } = 48;
+    }
+}

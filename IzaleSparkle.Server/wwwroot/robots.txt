@@ -1,0 +1,39 @@
+# Robots.txt for Izale Sparkle
+# https://izalesparkle.com/robots.txt
+
+User-agent: *
+Allow: /
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://izalesparkle.com/sitemap.xml
+
+# Block admin and internal paths
+Disallow: /admin/
+Disallow: /api/
+Disallow: /identity/
+Disallow: /*.json$
+Disallow: /service-worker.js$
+Disallow: /manifest.webmanifest$
+
+# Allow search engines to see the structured data
+Allow: /
+
+# Special instructions for major search engines
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 1
+
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 1

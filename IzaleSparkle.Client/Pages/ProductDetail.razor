@@ -2,10 +2,33 @@
 @inject IApiClient Api
 @inject ProductService FallbackSvc
 @inject CartService Cart
+@inject WishlistService Wishlist
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
 <PageTitle>@(Product?.Name ?? "Product") — Izale Sparkle</PageTitle>
+
+@if (Product != null)
+{
+    <SeoMeta 
+        Title="@($"{Product.Name} - {Product.Material} | Izale Sparkle")"
+        Description="@Product.Description"
+        Image="@Product.Images?.FirstOrDefault()"
+        Product="@(new SeoMeta.ProductSchemaData {
+            Id = Product.Id,
+            Name = Product.Name,
+            Description = Product.Description,
+            ImageUrl = Product.Images?.FirstOrDefault() ?? "",
+            Material = Product.Material,
+            Category = Product.Category,
+            Price = Product.Price,
+            InStock = Product.StockLevel > 0,
+            FreeShipping = Product.Price >= 30,
+            Rating = 5,
+            ReviewCount = 48
+        })"
+    />
+}
 
 @if (Product == null)
 {
@@ -20,7 +43,7 @@ else
     <div class="breadcrumb">
         <a href="/">Home</a> <span class="bsep">✦</span>
         <a href="/shop">Shop</a> <span class="bsep">✦</span>
-        <a href="/shop?cat=@Product.Category">@System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(Product.Category)</a> <span class="bsep">✦</span>
+        <a href="/shop?cat=@Product.Category">@CategoryLabel(Product.Category)</a> <span class="bsep">✦</span>
         <span class="bcurrent">@Product.Name</span>
     </div>
 
@@ -110,16 +133,16 @@ else
             </div>
 
             <div class="price-block">
-                <span class="price-main">£@Product.Price.ToString("N0")</span>
+                <span class="price-main">£@Product.Price.ToString("N2")</span>
                 @if (Product.IsOnSale && Product.OldPrice.HasValue)
                 {
-                    <span class="price-old">£@Product.OldPrice.Value.ToString("N0")</span>
+                    <span class="price-old">£@Product.OldPrice.Value.ToString("N2")</span>
                     @if (Product.SavePercent.HasValue && Product.SavePercent > 0)
                     {
                         <span class="price-save">Save @Product.SavePercent%</span>
                     }
                 }
-                <div class="price-vat">Inc. VAT · Free UK Delivery · Certificate Included</div>
+
             </div>
 
 
@@ -142,20 +165,12 @@ else
                 <button class="add-cart-btn @(AddedFeedback ? "added" : "") @(StockLevel <= 0 ? "btn-disabled" : "")" @onclick="AddToCart" disabled="@(StockLevel <= 0)">
                     @(StockLevel <= 0 ? "Out of Stock" : AddedFeedback ? "✓ Added!" : "Add to Sparkle Bag ✦")
                 </button>
-                <button class="wish-btn @(IsWishlisted ? "wishlisted" : "")" @onclick="() => IsWishlisted = !IsWishlisted">
-                    @(IsWishlisted ? "♥" : "♡")
+                <button class="wish-btn @(Wishlist.IsWishlisted(Product.Id) ? "wishlisted" : "")" @onclick="() => Wishlist.ToggleAsync(Product.Id)">
+                    @(Wishlist.IsWishlisted(Product.Id) ? "♥" : "♡")
                 </button>
             </div>
 
-            <button class="buy-now-btn" @onclick="BuyNow">Buy Now — Pay Securely ✦</button>
-
-            <div class="trust-pills">
-                <div class="trust-pill">🚚 Free UK Delivery</div>
-                <div class="trust-pill">🔁 30-Day Returns</div>
-                <div class="trust-pill">🛡️ Lifetime Guarantee</div>
-                <div class="trust-pill">✒️ Free Engraving</div>
-                <div class="trust-pill">📜 Certificate Included</div>
-            </div>
+            @* <button class="buy-now-btn" @onclick="BuyNow">Buy Now — Pay Securely ✦</button> *@
 
             <div class="info-divider"></div>
             <div class="share-row">
@@ -170,16 +185,16 @@ else
     <!-- TABS -->
     <div class="tabs-section">
         <div class="tab-nav">
-            <button class="tab-btn @(ActiveTab=="description"?"active":"")" @onclick="ShowDescriptionTab">Description</button>
+           @*  <button class="tab-btn @(ActiveTab=="description"?"active":"")" @onclick="ShowDescriptionTab">Description</button>
             <button class="tab-btn @(ActiveTab=="details"?"active":"")" @onclick="ShowDetailsTab">Details &amp; Care</button>
             <button class="tab-btn @(ActiveTab=="shipping"?"active":"")" @onclick="ShowShippingTab">Delivery &amp; Returns</button>
-            <button class="tab-btn @(ActiveTab=="reviews"?"active":"")" @onclick="ShowReviewsTab">Reviews (@ReviewCount)</button>
+            <button class="tab-btn @(ActiveTab=="reviews"?"active":"")" @onclick="ShowReviewsTab">Reviews (@ReviewCount)</button> *@
         </div>
 
         @if (ActiveTab == "description")
         {
             <div class="tab-panel">
-                <div class="desc-grid">
+               @*  <div class="desc-grid">
                     <div class="desc-text">
                         <p>The <strong>@Product.Name</strong> — @Product.Description</p>
                         <p>Every Izale Sparkle piece is hallmarked and comes with a full certificate of authenticity, a gift box, and our lifetime craftsmanship guarantee. <strong>Free engraving</strong> available on request.</p>
@@ -193,7 +208,7 @@ else
                         <div class="spec-row"><span>Delivery</span><span>Free UK · Tracked &amp; Insured</span></div>
                         <div class="spec-row"><span>Guarantee</span><span>Lifetime Craftsmanship</span></div>
                     </div>
-                </div>
+                </div> *@
             </div>
         }
 
@@ -288,7 +303,7 @@ else
             <img src="@Product.ImageUrl" alt="@Product.Name" class="sticky-img" />
             <div>
                 <div class="sticky-name">@Product.Name</div>
-                <div class="sticky-price">£@Product.Price.ToString("N0")</div>
+                <div class="sticky-price">£@Product.Price.ToString("N2")</div>
             </div>
         </div>
         <button class="sticky-add-btn" @onclick="AddToCart" disabled="@(StockLevel <= 0)">@(StockLevel <= 0 ? "Out of Stock" : "Add to Sparkle Bag ✦")</button>
@@ -301,13 +316,13 @@ else
     Product? Product;
     List<Product> Related = new();
     List<Review> Reviews = new();
+    List<CategoryResponse> Categories = new();
 
     string CurrentImage = "";
     int CurrentIndex = 0;
 
     string ActiveTab = "description";
     int Qty = 1;
-    bool IsWishlisted = false;
     bool AddedFeedback = false;
     int  StockLevel    = 99; // loaded with product
     bool ShowStickyBar = false;
@@ -340,12 +355,14 @@ else
         try
         {
             // ── API CALLS ─────────────────────────────────────────
+            Categories  = (await Api.GetAdminCategoriesAsync())?.ToList() ?? new();
             var dto     = await Api.GetProductAsync(Id);
             var related = await Api.GetRelatedAsync(Id, 4);
             var reviews = await Api.GetReviewsAsync(Id);
 
             if (dto != null)
             {
+                // Check if product is in stock (API returns 404 if out of stock)
                 // Map API DTO → local Product view-model
                 Product = new Product
                 {
@@ -362,8 +379,17 @@ else
                     IsVatApplicable = dto.IsVatApplicable,
                     Images      = dto.Images,
                 };
+                StockLevel = dto.StockLevel;
+                Product.StockLevel = dto.StockLevel;
+                Qty = 1;
                 CurrentImage = Product.Images.FirstOrDefault() ?? Product.ImageUrl;
                 CurrentIndex = 0;
+            }
+            else
+            {
+                // Product not found (either doesn't exist or is out of stock)
+                Nav.NavigateTo("/shop", replace: true);
+                return;
             }
 
             Related = related?.Select(r => new Product
@@ -372,7 +398,8 @@ else
                 Price    = r.Price, OldPrice = r.OldPrice, Badge = r.Badge,
                 Category = r.Category, Stars = r.Stars, ImageUrl = r.ImageUrl,
                 Images   = new List<string> { r.ImageUrl },
-            }).ToList() ?? new();
+                StockLevel = r.StockLevel,
+            }).Where(p => p.StockLevel > 0).ToList() ?? new();
 
             Reviews = reviews?.Select(r => new Review
             {
@@ -388,14 +415,29 @@ else
         {
             // Offline / API unavailable — fall back to in-memory data
             Product = FallbackSvc.GetById(Id);
-            if (Product != null)
+            if (Product != null && Product.StockLevel > 0)
             {
+                StockLevel = Product.StockLevel;
+                Product.StockLevel = Product.StockLevel;
+                Qty = 1;
                 CurrentImage = Product.Images.FirstOrDefault() ?? Product.ImageUrl;
-                Related      = FallbackSvc.GetRelated(Id, 4);
+                Related      = FallbackSvc.GetRelated(Id, 4).Where(p => p.StockLevel > 0).ToList();
                 Reviews      = FallbackSvc.GetReviews(Id);
                 ReviewCount  = Reviews.Count;
             }
+            else
+            {
+                // Product not found or out of stock — redirect to shop
+                Nav.NavigateTo("/shop", replace: true);
+            }
         }
+    }
+
+    string CategoryLabel(string category)
+    {
+        var slug = category.ToLower().Trim().Replace(" ", "-").Replace("'", "").Replace("&", "and");
+        var match = Categories.FirstOrDefault(c => c.Slug.Equals(slug, StringComparison.OrdinalIgnoreCase));
+        return match?.Name ?? System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(slug.Replace("-", " "));
     }
 
     void SetImage(int idx)
@@ -442,8 +484,10 @@ else
     // ── CART ────────────────────────────────────────────────────────────
     async Task AddToCart()
     {
-        if (Product == null) return;
-        Cart.AddItem(Product, Qty, "YellowGold18K", Product.Category == "rings" ? null : null);
+        if (Product == null || StockLevel <= 0) return;
+        var qtyToAdd = Math.Min(Qty, StockLevel);
+        Product.StockLevel = StockLevel;
+        Cart.AddItem(Product, qtyToAdd);
         AddedFeedback = true;
         await Task.Delay(2200);
         AddedFeedback = false;
@@ -451,8 +495,10 @@ else
 
     async Task BuyNow()
     {
-        if (Product == null) return;
-        Cart.AddItem(Product, Qty, "YellowGold18K", Product.Category == "rings" ? null : null);
+        if (Product == null || StockLevel <= 0) return;
+        var qtyToAdd = Math.Min(Qty, StockLevel);
+        Product.StockLevel = StockLevel;
+        Cart.AddItem(Product, qtyToAdd);
         Nav.NavigateTo("/checkout");
     }
 

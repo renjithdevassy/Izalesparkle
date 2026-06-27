@@ -1,0 +1,105 @@
+@page "/wishlist"
+@inject WishlistService WishSvc
+@inject CartService Cart
+@inject IApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>My Wishlist — Save Your Favourite Jewellery | Izale Sparkle</PageTitle>
+
+<SeoMeta 
+    Title="My Wishlist — Save Your Favourite Jewellery | Izale Sparkle"
+    Description="Save your favourite jewellery pieces to your wishlist. Keep track of items you love and shop later."
+/>
+
+<div class="page-hero" style="min-height:30vh">
+    <span class="page-hero-tag">✦ My Wishlist ✦</span>
+    <h1 class="page-hero-title">Saved <em>Pieces</em></h1>
+    <p class="page-hero-sub">Your saved jewellery waiting to sparkle.</p>
+</div>
+
+<div class="wishlist-container">
+    @if (Loading)
+    {
+        <div class="loading-screen">
+            <div class="loading-spinner">✦</div>
+        </div>
+    }
+    else if (!WishSvc.Items.Any())
+    {
+        <div class="wishlist-empty">
+            <div class="wishlist-empty-icon">♡</div>
+            <h2>Your wishlist is empty</h2>
+            <p>Save pieces you love and they'll appear here.</p>
+            <a href="/shop" class="btn btn-dark">Start Shopping ✦</a>
+        </div>
+    }
+    else
+    {
+        <div class="wishlist-count">@WishSvc.Items.Count piece@(WishSvc.Items.Count == 1 ? "" : "s") saved</div>
+        <div class="product-grid grid-4">
+            @foreach (var product in Products)
+            {
+                <ProductCard Summary="@product" />
+            }
+        </div>
+        <div class="wishlist-actions">
+            <a href="/shop" class="btn btn-outline">Continue Shopping ✦</a>
+            <button class="btn btn-outline" @onclick="ClearWishlist">Clear Wishlist</button>
+        </div>
+    }
+</div>
+
+@code {
+    bool Loading = true;
+    List<ProductSummaryResponse> Products = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWishlist();
+        WishSvc.OnChange += async () => await LoadWishlist();
+    }
+
+    async Task LoadWishlist()
+    {
+        if (!WishSvc.Items.Any())
+        {
+            Products = new();
+            Loading = false;
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            var allProducts = new List<ProductSummaryResponse>();
+            foreach (var id in WishSvc.Items)
+            {
+                var result = await Api.GetProductAsync(id);
+                if (result != null && result.StockLevel > 0)
+                {
+                    allProducts.Add(new ProductSummaryResponse(
+                        result.Id, result.Name, result.Slug, result.Material,
+                        result.Price, result.OldPrice, result.Category, result.Badge,
+                        result.Stars, result.ImageUrl, result.IsOnSale, result.SavePercent,
+                        result.IsVatApplicable, result.StockLevel));
+                }
+            }
+            Products = allProducts;
+        }
+        catch
+        {
+            Products = new();
+        }
+        Loading = false;
+    }
+
+    async Task ClearWishlist()
+    {
+        await WishSvc.ClearAsync();
+    }
+
+    public void Dispose()
+    {
+        WishSvc.OnChange -= async () => await LoadWishlist();
+    }
+}

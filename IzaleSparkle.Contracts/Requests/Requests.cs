@@ -31,7 +31,7 @@ public record PlaceOrderRequest(
 public record OrderItemRequest(
     int     ProductId,
     int     Quantity,
-    string  Metal,
+    string? Metal,
     string? Size
 );
 

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C1A16"/>
+      <stop offset="100%" style="stop-color:#2D2A24"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#C8973A"/>
+      <stop offset="100%" style="stop-color:#E8B84A"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- Decorative circles -->
+  <circle cx="100" cy="100" r="200" fill="#C8973A" opacity="0.05"/>
+  <circle cx="1100" cy="530" r="250" fill="#C8973A" opacity="0.05"/>
+  
+  <!-- Sparkle icon -->
+  <g transform="translate(600, 200)">
+    <polygon points="0,-80 10,-20 80,0 10,20 0,80 -10,20 -80,0 -10,-20" fill="url(#gold)"/>
+    <polygon points="0,-50 6,-12 50,0 6,12 0,50 -6,12 -50,0 -6,-12" fill="#FAF7EE" opacity="0.3"/>
+  </g>
+  
+  <!-- Brand name -->
+  <text x="600" y="380" text-anchor="middle" font-family="Georgia, serif" font-size="72" font-weight="400" fill="#C8973A" letter-spacing="8">IZALE</text>
+  <text x="600" y="450" text-anchor="middle" font-family="Georgia, serif" font-size="48" font-weight="400" fill="#FAF7EE" letter-spacing="12">SPARKLE</text>
+  
+  <!-- Tagline -->
+  <text x="600" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#FAF7EE" opacity="0.7" letter-spacing="4">WHERE EVERY LOOK SPARKLES</text>
+  
+  <!-- Bottom accent -->
+  <rect x="500" y="560" width="200" height="2" fill="url(#gold)"/>
+</svg>

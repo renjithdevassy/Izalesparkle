@@ -34,7 +34,7 @@ public record ProductResponse(
     bool    IsOnSale,
     int?    SavePercent,
     int     StockLevel = 0,
-    bool    IsVatApplicable = true
+    bool    IsVatApplicable = false
 );
 
 public record ProductSummaryResponse(
@@ -50,7 +50,8 @@ public record ProductSummaryResponse(
     string  ImageUrl,
     bool    IsOnSale,
     int?    SavePercent,
-    bool    IsVatApplicable = true
+    bool    IsVatApplicable = false,
+    int     StockLevel = 0
 );
 
 public record ReviewResponse(
@@ -124,7 +125,17 @@ public record AdminProductResponse(
     string? SupplierSku,
     bool    LowStock,
     bool    OutOfStock,
-    int     TotalPurchased
+    int     TotalPurchased,
+    bool    IsVatApplicable = false
+);
+
+/// <summary>Result of importing products from the WhatsApp/Meta catalog.</summary>
+public record WhatsAppSyncResponse(
+    int Created,
+    int Updated,
+    int Skipped,
+    int Total,
+    List<string> Messages
 );
 
 public record CategoryResponse(
@@ -145,7 +156,14 @@ public record AdminDashboardResponse(
     int   PendingOrders,
     decimal TotalRevenue,
     List<AdminProductResponse> RecentProducts,
-    List<OrderResponse>        RecentOrders
+    List<OrderResponse>        RecentOrders,
+    decimal TodayRevenue       = 0,
+    decimal AverageOrderValue  = 0,
+    int     CancelledOrders    = 0,
+    int     DeliveredOrders    = 0,
+    int     LowStockCount      = 0,
+    int     TotalViews         = 0,
+    int     TodayViews         = 0
 );
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -191,6 +209,7 @@ public record OrdersReportResponse(
     int     TotalOrders,
     int     PendingOrders,
     int     ProcessingOrders,
+    int     CollectionReadyOrders,
     int     ShippedOrders,
     int     DeliveredOrders,
     int     CancelledOrders,

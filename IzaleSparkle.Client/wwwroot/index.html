@@ -2,15 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
 
     <!-- MOBILE FIRST VIEWPORT -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
 
-    <!-- SEO -->
-    <meta name="description" content="Izale Sparkle — Where Every Look Sparkles. Fine jewellery handcrafted with conflict-free gemstones and 18K gold." />
-    <meta name="keywords" content="fine jewellery, diamond rings, gold necklaces, luxury jewellery, engagement rings" />
-    <title>Izale Sparkle — Where Every Look Sparkles</title>
+    <!-- CORE SEO -->
+    <title>Izale Sparkle — Indian Jewellery Online UK | Gold Necklaces, Bridal Sets & Temple Jewellery</title>
+    <meta name="description" content="Shop authentic Indian jewellery online in UK. Gold necklaces, bridal sets, temple jewellery, bangles, earrings & anklets. Handcrafted 18K gold with conflict-free gemstones. Free UK delivery over £30. Fast same-day dispatch." />
+    <meta name="keywords" content="Indian jewellery UK, Asian jewellery UK, bridal jewellery sets, gold necklaces UK, temple jewellery, South Indian jewellery, wedding jewellery UK, bangles UK, anklets, gold earrings UK, necklace sets, Pakistani jewellery, desi jewellery UK, gold chains, Indian jeweller Haywards Heath" />
+    <meta name="author" content="Izale Sparkle" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://izalesparkle.com/" />
     <base href="/" />
+
+    <!-- GEO TAGS -->
+    <meta name="geo.region" content="GB-SX" />
+    <meta name="geo.placename" content="Haywards Heath" />
+    <meta name="geo.position" content="51.0000;-0.1000" />
+    <meta name="ICBM" content="51.0000, -0.1000" />
+
+    <!-- BUSINESS INFO -->
+    <meta name="business:contact_data:street_address" content="45 Ryecroft" />
+    <meta name="business:contact_data:locality" content="Haywards Heath" />
+    <meta name="business:contact_data:postal_code" content="RH16 4NW" />
+    <meta name="business:contact_data:country_name" content="United Kingdom" />
 
     <!-- PWA MANIFEST -->
     <link rel="manifest" href="manifest.webmanifest" />
@@ -23,17 +39,37 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Izale Sparkle" />
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.svg" />
 
-    <!-- OPEN GRAPH / SOCIAL -->
-    <meta property="og:type"        content="website" />
-    <meta property="og:title"       content="Izale Sparkle — Where Every Look Sparkles" />
-    <meta property="og:description" content="Fine jewellery handcrafted with conflict-free gemstones and 18K gold." />
-    <meta property="og:image"       content="icons/icon-512.png" />
+    <!-- OPEN GRAPH / FACEBOOK -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Izale Sparkle" />
+    <meta property="og:url" content="https://izalesparkle.com/" />
+    <meta property="og:title" content="Izale Sparkle — Indian Jewellery UK | Gold Necklaces, Bridal Sets & Temple Jewellery" />
+    <meta property="og:description" content="Shop authentic Indian jewellery online in UK. Gold necklaces, bridal sets, temple jewellery, bangles & earrings. Handcrafted with 18K gold." />
+    <meta property="og:image" content="https://izalesparkle.com/icons/og-image.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/svg+xml" />
+    <meta property="og:locale" content="en_GB" />
+
+    <!-- TWITTER/X CARDS -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@izalesparkle" />
+    <meta name="twitter:title" content="Izale Sparkle — Indian Jewellery UK" />
+    <meta name="twitter:description" content="Shop authentic Indian jewellery online in UK. Gold necklaces, bridal sets, temple jewellery & bangles." />
+    <meta name="twitter:image" content="https://izalesparkle.com/icons/og-image.svg" />
+
+    <!-- FAVICON -->
+    <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg" />
 
     <!-- MOBILE: disable tap highlight, touch callout -->
     <meta name="format-detection" content="telephone=no" />
     <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- HREFLANG for multilingual (UK English) -->
+    <link rel="alternate" hreflang="en-gb" href="https://izalesparkle.com/" />
+    <link rel="alternate" hreflang="x-default" href="https://izalesparkle.com/" />
 
     <!-- FONTS -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,7 +78,6 @@
 
     <!-- STYLES -->
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="IzaleSparkle.styles.css" />
 </head>
 <body>
     <div id="app">
@@ -69,7 +104,12 @@
 
     <!-- SERVICE WORKER REGISTRATION -->
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && location.hostname === 'localhost') {
+            navigator.serviceWorker.getRegistrations()
+                .then(registrations => registrations.forEach(reg => reg.unregister()));
+            caches?.keys?.()
+                .then(keys => keys.forEach(key => caches.delete(key)));
+        } else if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js', { scope: '/' })
                 .then(reg => {
                     console.log('[SW] Registered:', reg.scope);
@@ -100,6 +140,24 @@
             console.log('[PWA] App installed');
         });
     </script>
+    <!-- BROKEN-IMAGE FALLBACK — replaces any failed image with a subtle on-brand placeholder
+         instead of a broken-image icon. Uses capture phase since 'error' events don't bubble. -->
+    <script>
+        (function () {
+            var PLACEHOLDER = "data:image/svg+xml," + encodeURIComponent(
+                "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'>" +
+                "<rect width='100%' height='100%' fill='#F5F0E1'/>" +
+                "<text x='50%' y='53%' font-family='Playfair Display, serif' font-size='70' " +
+                "fill='#C8973A' text-anchor='middle' opacity='0.55'>&#10022;</text></svg>");
+            document.addEventListener('error', function (e) {
+                var el = e.target;
+                if (el && el.tagName === 'IMG' && !el.dataset.imgFallback) {
+                    el.dataset.imgFallback = '1';
+                    el.src = PLACEHOLDER;
+                }
+            }, true);
+        })();
+    </script>
     <script>
         window.downloadFileFromBytes = (base64, filename, mimeType) => {
             const bytes = atob(base64);
@@ -114,4 +172,3 @@
     </script>
 </body>
 </html>
-

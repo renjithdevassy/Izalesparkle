@@ -3,15 +3,20 @@ using IzaleSparkle.Infrastructure;
 using IzaleSparkle.Infrastructure.Persistence;
 using IzaleSparkle.Server.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
+using Microsoft.Data.SqlClient;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtection-Keys")));
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -40,7 +45,11 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // JWT Authentication
-var jwtSecret   = builder.Configuration["Jwt:Secret"]   ?? "IzaleSparkle-Super-Secret-32Chars!";
+// Use IsNullOrWhiteSpace (not ??) so an empty config value also falls back —
+// otherwise an empty Jwt:Secret produces a zero-length key and crashes at startup.
+var jwtSecret   = builder.Configuration["Jwt:Secret"];
+if (string.IsNullOrWhiteSpace(jwtSecret))
+    jwtSecret = "IzaleSparkle-Super-Secret-Key-Must-Be-32-Chars!!";
 var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "IzaleSparkle";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "IzaleSparkleUsers";
 
@@ -76,9 +85,19 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-    await DbSeeder.SeedAsync(db, cfg);
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        await DbSeeder.SeedAsync(db, cfg);
+    }
+    catch (SqlException ex) when (app.Environment.IsDevelopment())
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DatabaseStartup");
+        logger.LogError(ex,
+            "Database seeding failed. The site will still start, but API data and admin features may not work until SQL Server is reachable.");
+    }
 }
 
 if (app.Environment.IsDevelopment())

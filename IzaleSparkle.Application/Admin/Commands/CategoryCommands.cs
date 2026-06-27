@@ -28,7 +28,7 @@ public sealed class GetCategoriesAdminQueryHandler(IUnitOfWork uow)
         var products = await uow.Products.GetAllAsync(ct);
 
         var counts = products
-            .GroupBy(p => p.Category.ToString().ToLower())
+            .GroupBy(p => Category.ToSlug(p.Category))
             .ToDictionary(g => g.Key, g => g.Count());
 
         return cats
@@ -85,14 +85,27 @@ public sealed class UpdateCategoryAdminCommandHandler(IUnitOfWork uow)
         var req = cmd.Request;
         var cat = await uow.Categories.GetByIdAsync(req.Id, ct)
             ?? throw new NotFoundException(nameof(Category), req.Id);
+        var oldSlug = cat.Slug;
+        var newSlug = Category.ToSlug(req.Name);
 
         cat.Name        = req.Name.Trim();
-        cat.Slug        = Category.ToSlug(req.Name);
+        cat.Slug        = newSlug;
         cat.Description = req.Description;
         cat.Icon        = string.IsNullOrWhiteSpace(req.Icon) ? "💎" : req.Icon;
         cat.SortOrder   = req.SortOrder;
         cat.IsActive    = req.IsActive;
         cat.UpdatedAt   = DateTime.UtcNow;
+
+        if (!oldSlug.Equals(newSlug, StringComparison.OrdinalIgnoreCase))
+        {
+            var products = await uow.Products.GetAllAsync(ct);
+            foreach (var product in products.Where(p =>
+                         Category.ToSlug(p.Category).Equals(oldSlug, StringComparison.OrdinalIgnoreCase)))
+            {
+                product.UpdateCategory(newSlug);
+                uow.Products.Update(product);
+            }
+        }
 
         uow.Categories.Update(cat);
         await uow.SaveChangesAsync(ct);

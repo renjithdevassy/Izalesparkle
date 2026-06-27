@@ -149,6 +149,26 @@ public class AdminController(IMediator mediator) : ControllerBase
         return Ok(ApiResponse<bool>.Ok(result, "Invoice sent to customer."));
     }
 
+    // ── WHATSAPP CATALOG SYNC ────────────────────────────────────
+    /// <summary>Import / refresh products from the linked WhatsApp/Meta catalog.</summary>
+    [HttpPost("sync-whatsapp")]
+    [ProducesResponseType(typeof(ApiResponse<WhatsAppSyncResponse>), 200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> SyncWhatsApp(CancellationToken ct)
+    {
+        try
+        {
+            var result = await mediator.Send(new SyncWhatsAppCatalogCommand(), ct);
+            return Ok(ApiResponse<WhatsAppSyncResponse>.Ok(result,
+                $"Sync complete — {result.Created} added, {result.Updated} updated, {result.Skipped} skipped."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Config missing or Meta rejected the request — surface a clean message to the admin.
+            return BadRequest(ApiResponse<WhatsAppSyncResponse>.Fail(ex.Message));
+        }
+    }
+
     // ── USERS ────────────────────────────────────────────────────
     /// <summary>List all registered users — view only.</summary>
     [HttpGet("users")]

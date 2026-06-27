@@ -22,12 +22,21 @@
       Requires: dotnet workload install wasm-tools
     -->
     <RunAOTCompilation Condition="'$(EnableAot)' == 'true'">true</RunAOTCompilation>
+
+    <!-- Disable Hot Reload in Release — prevents dev-only module from loading in production -->
+    <WasmHotReloadEnabled Condition="'$(Configuration)' == 'Release'">false</WasmHotReloadEnabled>
+    <InvariantGlobalization Condition="'$(Configuration)' == 'Release'">false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\IzaleSparkle.Contracts\IzaleSparkle.Contracts.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0-preview.*" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
+  </ItemGroup>
+
+  <!-- Explicitly strip hot-reload package from Release to prevent production runtime error -->
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <PackageReference Remove="Microsoft.DotNet.HotReload.WebAssembly.Browser" />
   </ItemGroup>
 
   <ItemGroup>

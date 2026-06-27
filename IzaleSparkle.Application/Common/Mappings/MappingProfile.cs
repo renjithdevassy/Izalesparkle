@@ -21,7 +21,7 @@ public class MappingProfile : Profile
                 Material:    s.Material,
                 Price:       s.Price.Amount,
                 OldPrice:    s.OldPrice == null ? null : s.OldPrice.Amount,
-                Category:    s.Category.ToString().ToLower(),
+                Category:    Category.ToSlug(s.Category),
                 Badge:       s.Badge == null ? null : s.Badge.ToString()!.ToLower(),
                 Stars:       s.Stars,
                 ImageUrl:    s.ImageUrl,
@@ -42,13 +42,14 @@ public class MappingProfile : Profile
                 Material:    s.Material,
                 Price:       s.Price.Amount,
                 OldPrice:    s.OldPrice == null ? null : s.OldPrice.Amount,
-                Category:    s.Category.ToString().ToLower(),
+                Category:    Category.ToSlug(s.Category),
                 Badge:       s.Badge == null ? null : s.Badge.ToString()!.ToLower(),
                 Stars:       s.Stars,
                 ImageUrl:    s.ImageUrl,
                 IsOnSale:        s.IsOnSale,
                 SavePercent:     s.SavePercent,
-                IsVatApplicable: s.IsVatApplicable
+                IsVatApplicable: s.IsVatApplicable,
+                StockLevel:      s.StockLevel
             ))
             .ForAllMembers(o => o.Ignore());
 
@@ -94,9 +95,18 @@ public class MappingProfile : Profile
                 UnitPrice:   s.UnitPrice.Amount,
                 Quantity:    s.Quantity,
                 LineTotal:   s.LineTotal.Amount,
-                Metal:       s.Metal.ToString(),
+                Metal:       FormatMetal(s.Metal),
                 Size:        s.Size
             ))
             .ForAllMembers(o => o.Ignore());
     }
+
+    private static string FormatMetal(IzaleSparkle.Domain.Enums.MetalType metal) => metal switch
+    {
+        IzaleSparkle.Domain.Enums.MetalType.WhiteGold18K  => "18K White Gold",
+        IzaleSparkle.Domain.Enums.MetalType.YellowGold18K => "18K Yellow Gold",
+        IzaleSparkle.Domain.Enums.MetalType.RoseGold18K   => "18K Rose Gold",
+        IzaleSparkle.Domain.Enums.MetalType.Platinum      => "Platinum",
+        _                                                  => metal.ToString()
+    };
 }

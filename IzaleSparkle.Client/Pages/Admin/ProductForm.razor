@@ -71,7 +71,6 @@ else
                     🔒 Stored securely. Only visible in the admin panel.
                 </div>
             </div>
-
             <div class="admin-field">
                 <label>VAT <small>UK standard rate 20%</small></label>
                 <div class="admin-toggle-row">
@@ -88,9 +87,10 @@ else
                     <label>Category *</label>
                     <select @bind="Category" class="@(ShowErr && string.IsNullOrWhiteSpace(Category) ? "field-error" : "")">
                         <option value="">— Select —</option>
-                        <option value="rings">Rings</option>
-                        <option value="necklaces">Necklaces</option>
-                        <option value="earrings">Earrings</option>
+                        @foreach (var cat in FormCategories)
+                        {
+                            <option value="@cat.Slug">@cat.Name</option>
+                        }
                     </select>
                 </div>
                 <div class="admin-field">
@@ -433,7 +433,7 @@ else
     int     Stars       = 5;
     decimal? CostPrice      = null;
     List<CategoryResponse> FormCategories = new();
-    bool     IsVatApplicable = true;  // admin-only — VAT flag
+    // bool     IsVatApplicable = true;  // admin-only — VAT flag
     int      StockLevelVal = 0;
     int      ReorderPoint  = 2;
     int      LeadTimeDays  = 14;
@@ -442,8 +442,7 @@ else
     string  ImageUrl    = "";       // main image
     bool    IsActive    = true;
     List<string> AllImages = new(); // gallery images (excludes main)
-
-    // Stock info (loaded when editing)
+    bool     IsVatApplicable = false;  // admin-only — VAT flag (defaults to exempt)
     StockLevelResponse? StockInfo;
 
     // Attributes (future feature)
@@ -455,6 +454,9 @@ else
     }
     List<AttributeItem> Attributes = new();
     void AddAttribute() { if (Attributes.Count < 10) Attributes.Add(new AttributeItem()); }
+
+    static string ToSlug(string value) =>
+        value.ToLower().Trim().Replace(" ", "-").Replace("'", "").Replace("&", "and");
 
     // Upload state
     string UploadTab     = "upload";
@@ -469,7 +471,7 @@ else
     List<ImgSuggestion> UnsplashSuggestions = new()
     {
         new("Ring 1",     "https://images.unsplash.com/photo-1605100804763-247f67b3557e"),
-        new("Ring 2",     "https://images.unsplash.com/photo-1573408301185-9519f94bf22b"),
+        new("Ring 2",     "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908"),
         new("Ring 3",     "https://images.unsplash.com/photo-1602173574767-37ac01994b2a"),
         new("Necklace 1", "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f"),
         new("Necklace 2", "https://images.unsplash.com/photo-1506630448388-4e683c67ddb0"),
@@ -495,7 +497,7 @@ else
                     Material    = p.Material;
                     Price       = p.Price;
                     OldPrice    = p.OldPrice;
-                    Category    = p.Category;
+                    Category    = ToSlug(p.Category);
                     Badge       = p.Badge ?? "";
                     Stars       = p.Stars;
                     ImageUrl    = p.ImageUrl;
@@ -505,6 +507,7 @@ else
                     LeadTimeDays  = p.LeadTimeDays;
                     Supplier      = p.Supplier ?? string.Empty;
                     SupplierSku   = p.SupplierSku ?? string.Empty;
+                    IsVatApplicable = p.IsVatApplicable;
                     IsActive      = p.IsActive;
                     // All images from API — first is main, rest are gallery
                     var imgs = p.Images.Where(u => !string.IsNullOrWhiteSpace(u)).ToList();
@@ -522,8 +525,8 @@ else
             }
             catch { /* non-critical */ }
         }
-        // Load categories for dropdown
-        try { FormCategories = (await Api.GetAdminCategoriesAsync())?.Where(c => c.IsActive).ToList() ?? new(); }
+        // Load categories for dropdown (include inactive for editing existing products)
+        try { FormCategories = (await Api.GetAdminCategoriesAsync())?.ToList() ?? new(); }
         catch { }
         Loading = false;
     }

@@ -1,9 +1,13 @@
 @inherits LayoutComponentBase
 @inject CartService Cart
+@inject WishlistService Wishlist
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject AuthService Auth
+@inject IApiClient Api
 @implements IDisposable
+
+<SeoMeta IsHomepage="@(Nav.Uri == Nav.BaseUri || Nav.Uri == Nav.BaseUri.TrimEnd('/'))" />
 
 <div class="page-wrap @(MenuOpen ? "menu-is-open" : "")">
 
@@ -30,11 +34,9 @@
         <!-- Desktop nav links (hidden on mobile, shown ≥1024px) -->
         <ul class="nav-links" role="list">
             <li><a href="/"            class="@NavClass("")"           @onclick="CloseMenu">Home</a></li>
-            <li><a href="/shop"        class="@NavClass("shop")"       @onclick="CloseMenu">Shop</a></li>
-            <li><a href="/collections" class="@NavClass("collections")" @onclick="CloseMenu">Collections</a></li>
-            <li><a href="/about"       class="@NavClass("about")"      @onclick="CloseMenu">About</a></li>
+            <li><a href="/shop"        class="@NavClass("shop")"       @onclick="CloseMenu">Online Shop</a></li>
             <li><a href="/contact"     class="@NavClass("contact")"    @onclick="CloseMenu">Contact</a></li>
-            <li><a href="/admin"         class="@NavClass("admin")"      @onclick="CloseMenu" style="color:var(--gold)">Admin</a></li>
+            <li><a href="/terms"       class="@NavClass("terms")"      @onclick="CloseMenu">Terms</a></li>
         </ul>
 
         <!-- Action icons -->
@@ -66,6 +68,13 @@
             {
                 <a href="/login" class="nav-icon-btn" title="Sign In" aria-label="Sign In">👤</a>
             }
+            <a href="/wishlist" class="nav-icon-btn" title="Wishlist" aria-label="Wishlist">
+                ♡
+                @if (Wishlist.Count > 0)
+                {
+                    <span class="cart-badge" aria-label="@Wishlist.Count items">@(Wishlist.Count > 9 ? "9+" : Wishlist.Count.ToString())</span>
+                }
+            </a>
             <button class="nav-icon-btn cart-btn" @onclick="ToggleCart" title="Shopping bag" aria-label="Shopping bag">
                 🛍️
                 @if (Cart.Count > 0)
@@ -121,17 +130,7 @@
             </a>
             <a href="/shop"        class="mobile-nav-link @NavClass("shop")"       @onclick="CloseMenu">
                 <span class="mobile-nav-icon">💎</span>
-                <span>Shop</span>
-                <span class="mobile-nav-arrow">›</span>
-            </a>
-            <a href="/collections" class="mobile-nav-link @NavClass("collections")" @onclick="CloseMenu">
-                <span class="mobile-nav-icon">✨</span>
-                <span>Collections</span>
-                <span class="mobile-nav-arrow">›</span>
-            </a>
-            <a href="/about"       class="mobile-nav-link @NavClass("about")"      @onclick="CloseMenu">
-                <span class="mobile-nav-icon">♡</span>
-                <span>About</span>
+                <span>Online Shop</span>
                 <span class="mobile-nav-arrow">›</span>
             </a>
             <a href="/contact"     class="mobile-nav-link @NavClass("contact")"    @onclick="CloseMenu">
@@ -139,12 +138,14 @@
                 <span>Contact</span>
                 <span class="mobile-nav-arrow">›</span>
             </a>
-            <a href="/admin" class="mobile-nav-link @NavClass("admin")" @onclick="CloseMenu" style="border-top:1px solid var(--gold);color:var(--gold)">
-                <span class="mobile-nav-icon">⚙️</span>
-                <span>Admin Panel</span>
+            <a href="/wishlist"    class="mobile-nav-link @NavClass("wishlist")"    @onclick="CloseMenu">
+                <span class="mobile-nav-icon">♡</span>
+                <span>Wishlist @(Wishlist.Count > 0 ? $"({Wishlist.Count})" : "")</span>
                 <span class="mobile-nav-arrow">›</span>
-                <span class="mobile-nav-icon">✉</span>
-                <span>Contact</span>
+            </a>
+            <a href="/terms"      class="mobile-nav-link @NavClass("terms")"      @onclick="CloseMenu">
+                <span class="mobile-nav-icon">📜</span>
+                <span>Terms</span>
                 <span class="mobile-nav-arrow">›</span>
             </a>
         </nav>
@@ -153,10 +154,10 @@
         <div class="mobile-menu-cats">
             <div class="mobile-cats-title">Shop by Category</div>
             <div class="mobile-cats-grid">
-                <a href="/shop?cat=rings"     class="mobile-cat-chip" @onclick="CloseMenu">Rings</a>
-                <a href="/shop?cat=necklaces" class="mobile-cat-chip" @onclick="CloseMenu">Necklaces</a>
-                <a href="/shop?cat=earrings"  class="mobile-cat-chip" @onclick="CloseMenu">Earrings</a>
-                <a href="/shop?cat=bracelets" class="mobile-cat-chip" @onclick="CloseMenu">Bracelets</a>
+                @foreach (var cat in MobileCategories)
+                {
+                    <a href="/shop?cat=@cat.Slug" class="mobile-cat-chip" @onclick="CloseMenu">@cat.Name</a>
+                }
             </div>
         </div>
 
@@ -188,7 +189,7 @@
             <!-- Brand column -->
             <div class="footer-brand-col">
                 <div class="footer-logo">Izale <span class="gold">✦</span> Sparkle</div>
-                <p class="footer-tagline">"Where Every Look Sparkles" — fine jewellery handcrafted with conflict-free gemstones.</p>
+                <p class="footer-tagline">"Where Every Look Sparkles"</p>
                 <div class="footer-socials">
                     <a class="social-link" href="#" aria-label="Facebook">f</a>
                     <a class="social-link" href="#" aria-label="Instagram">◎</a>
@@ -256,8 +257,8 @@
                     <img src="@item.Product.ImageUrl" alt="@item.Product.Name" class="cart-item-img" loading="lazy" />
                     <div class="cart-item-info">
                         <div class="cart-item-name">@item.Product.Name</div>
-                        <div class="cart-item-meta">@item.SelectedMetal · Qty @item.Quantity</div>
-                        <div class="cart-item-price">£@item.LineTotal.ToString("N0")</div>
+                        <div class="cart-item-meta">Qty @item.Quantity</div>
+                        <div class="cart-item-price">£@item.LineTotal.ToString("N2")</div>
                     </div>
                     <button class="cart-item-remove" @onclick="() => Cart.RemoveItem(item.Product.Id)" aria-label="Remove @item.Product.Name">✕</button>
                 </div>
@@ -269,10 +270,10 @@
         <div class="cart-drawer-foot">
             <div class="cart-foot-total">
                 <span>Total</span>
-                <span class="cart-total-amt">£@Cart.Subtotal.ToString("N0")</span>
+                <span class="cart-total-amt">£@Cart.Subtotal.ToString("N2")</span>
             </div>
             <a href="/checkout" @onclick="ToggleCart" class="checkout-link">
-                Checkout — £@Cart.Subtotal.ToString("N0")
+                Checkout — £@Cart.Subtotal.ToString("N2")
             </a>
         </div>
     }
@@ -332,12 +333,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        await JS.InvokeVoidAsync("initCursor");
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initCursor");
+            await JS.InvokeVoidAsync("initNavScroll");
+            await JS.InvokeVoidAsync("addPwaInstallListener", DotNetObjectReference.Create(this));
+            await JS.InvokeVoidAsync("addSwUpdateListener",   DotNetObjectReference.Create(this));
+        }
+
+        // Re-run on every render so scroll-reveal elements become visible again
+        // after client-side navigation (e.g. clicking Home/logo), not just first load.
         await JS.InvokeVoidAsync("initScrollReveal");
-        await JS.InvokeVoidAsync("initNavScroll");
-        await JS.InvokeVoidAsync("addPwaInstallListener", DotNetObjectReference.Create(this));
-        await JS.InvokeVoidAsync("addSwUpdateListener",   DotNetObjectReference.Create(this));
     }
 
     protected override void OnInitialized() { Cart.OnChange += StateHasChanged; Auth.OnAuthChanged += StateHasChanged; }
@@ -350,12 +356,13 @@
     void CloseSearch() { SearchOpen = false; NavSearchQ = ""; }
 
     void DoSearch()
-    {
+    {   
+
         if (!string.IsNullOrWhiteSpace(NavSearchQ))
         {
-            Nav.NavigateTo($"/shop?q={Uri.EscapeDataString(NavSearchQ.Trim())}");
+            Nav.NavigateTo($"/shop?Q={Uri.EscapeDataString(NavSearchQ.Trim())}");
             CloseSearch();
-        }
+        }   
     }
 
     void OnSearchKey(KeyboardEventArgs e)
@@ -367,10 +374,49 @@
     record FooterLink  (string Label, string Href);
     record FooterColumn(string Title, List<FooterLink> Links);
 
-    List<FooterColumn> FooterCols = new()
+    record MobileCatItem(string Slug, string Name);
+
+    List<FooterColumn> FooterCols = new();
+    List<MobileCatItem> MobileCategories = new();
+
+    async Task LoadCategories()
     {
-        new("Shop",  new(){ new("Rings","/shop?cat=rings"), new("Necklaces","/shop?cat=necklaces"), new("Earrings","/shop?cat=earrings"), new("Bracelets","/shop?cat=bracelets"), new("All Jewellery","/shop") }),
-        new("Help",  new(){ new("Contact Us","/contact"), new("Sizing Guide","#"), new("Returns","#"), new("Track Order","#"), new("FAQ","#") }),
-        new("About", new(){ new("Our Story","/about"), new("Bespoke","/about#bespoke"), new("Sustainability","/about#ethics"), new("Press","#") }),
-    };
+        try
+        {
+            var cats = await Api.GetAdminCategoriesAsync();
+            if (cats != null && cats.Any())
+            {
+                var activeCats = cats.Where(x => x.IsActive).OrderBy(x => x.SortOrder).ToList();
+                MobileCategories = activeCats.Select(c => new MobileCatItem(c.Slug, c.Name)).ToList();
+                FooterCols = new List<FooterColumn>
+                {
+                    new("Online Shop", activeCats.Select(c => new FooterLink(c.Name, $"/shop?cat={c.Slug}"))
+                        .Concat(new[] { new FooterLink("All Jewellery", "/shop") }).ToList()),
+                    new("Help",  new List<FooterLink> { new("Contact Us","/contact")}),
+                };
+            }
+        }
+        catch { }
+        if (!MobileCategories.Any())
+        {
+            MobileCategories = new List<MobileCatItem>
+            {
+                new("rings", "Rings"), new("necklaces", "Necklaces"),
+                new("earrings", "Earrings"), new("bracelets", "Bracelets")
+            };
+            FooterCols = new List<FooterColumn>
+            {
+                new("Online Shop",  new List<FooterLink> { new("Rings","/shop?cat=rings"), new("Necklaces","/shop?cat=necklaces"), new("Earrings","/shop?cat=earrings"), new("Bracelets","/shop?cat=bracelets"), new("All Jewellery","/shop") }),
+                new("Help",  new List<FooterLink> { new("Contact Us","/contact") }),
+            };
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+        // Record one website visit per app load (public storefront only — the
+        // admin panel uses a different layout so admin activity isn't counted).
+        _ = Api.TrackVisitAsync(Nav.ToBaseRelativePath(Nav.Uri));
+    }
 }

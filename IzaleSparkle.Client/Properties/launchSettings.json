@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "IzaleSparkle.Client": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:60625;http://localhost:60626"
+    }
+  }
+}

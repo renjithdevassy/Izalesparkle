@@ -3,13 +3,18 @@
 @inject ProductService FallbackSvc
 @inject NavigationManager Nav
 
-<PageTitle>Shop — Izale Sparkle</PageTitle>
+<PageTitle>Online Shop — Fine Jewellery | Izale Sparkle</PageTitle>
 
 <div class="page-hero" style="min-height:35vh">
-    <span class="page-hero-tag">✦ Shop ✦</span>
+    <span class="page-hero-tag">✦ Online Shop ✦</span>
     <h1 class="page-hero-title">Fine <em>Jewellery</em></h1>
     <p class="page-hero-sub">Every piece made to make you sparkle.</p>
 </div>
+
+<SeoMeta 
+    Title="Online Shop — Fine Jewellery UK | Izale Sparkle"
+    Description="Shop our collection of fine jewellery including rings, necklaces, earrings and bracelets. Handcrafted with conflict-free gemstones and 18K gold. Free delivery on orders over £30."
+/>
 
 <!-- Mobile chip filter bar -->
 <div class="shop-filter-bar">
@@ -68,10 +73,10 @@
             </select>
         </div>
         <div class="sb-section">
-            <div class="sb-title">Max Price</div>
-            <input type="range" class="price-slider" min="500" max="10000" step="100"
+            <div class="sb-title">Price Range</div>
+            <input type="range" class="price-slider" min="2" max="30" step="1"
                    @bind="MaxPrice" @bind:event="oninput" @bind:after="ApplyFilters" />
-            <div class="price-labels"><span>£500</span><span>£@MaxPrice.ToString("N0")</span></div>
+            <div class="price-labels"><span>£2</span><span>£@MaxPrice</span></div>
         </div>
         <div class="sb-section">
             <div class="sb-title">Search</div>
@@ -109,13 +114,14 @@
 
 @code {
     [SupplyParameterFromQuery] public string? Cat { get; set; }
+    [SupplyParameterFromQuery] public string? Q { get; set; }
 
     bool Loading = true;
     List<ProductSummaryResponse> FilteredProducts = new();
     List<ProductSummaryResponse> AllProducts = new();
     string Category    = "all";
     string Sort        = "default";
-    decimal MaxPrice   = 10000;
+    decimal MaxPrice   = 30;
     string SearchQuery = "";
     bool GridView      = true;
     bool SortSheetOpen = false;
@@ -140,7 +146,7 @@
                     Categories.Add(new(c.Slug, c.Name, c.ProductCount.ToString()));
             }
         }
-        catch { /* keep defaults */ }
+        catch { /* keep defaults if API fails */ }
     }
 
     List<SortItem> SortOptions = new()
@@ -155,6 +161,7 @@
     protected override async Task OnInitializedAsync()
     {
         if (!string.IsNullOrEmpty(Cat)) Category = Cat;
+        if (!string.IsNullOrEmpty(Q)) SearchQuery = Q;
         await LoadCategories();
         await ApplyFilters();
     }
@@ -174,11 +181,11 @@
             var req = new GetProductsRequest(
                 Category: Category == "all" ? null : Category,
                 Search:   SearchQuery,
-                MaxPrice: MaxPrice < 10000 ? MaxPrice : null,
+                MaxPrice: MaxPrice < 30 ? MaxPrice : null,
                 Sort:     Sort,
                 PageSize: 100);
             var result = await Api.GetProductsAsync(req);
-            FilteredProducts = result?.Items.ToList() ?? new();
+            FilteredProducts = result?.Items.Where(p => p.StockLevel > 0).ToList() ?? new();
         }
         catch
         {
@@ -194,7 +201,7 @@
 
     async Task ClearFilters()
     {
-        Category = "all"; Sort = "default"; MaxPrice = 10000; SearchQuery = "";
+        Category = "all"; Sort = "default"; MaxPrice = 30; SearchQuery = "";
         await ApplyFilters();
     }
 }

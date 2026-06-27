@@ -32,7 +32,10 @@ public class ProductRepository(AppDbContext db)
     {
         var q = _db.Products.Include(p => p.Images).Where(p => p.IsActive);
         if (!string.IsNullOrWhiteSpace(category) && category != "all")
-            q = q.Where(p => p.Category.ToString().ToLower() == category.ToLower());
+        {
+            var normalizedCategory = Category.ToSlug(category);
+            q = q.Where(p => p.Category.ToLower() == normalizedCategory);
+        }
         return await q.ToListAsync(ct);
     }
 
@@ -42,7 +45,10 @@ public class ProductRepository(AppDbContext db)
         var q = _db.Products.Include(p => p.Images).Where(p => p.IsActive);
 
         if (!string.IsNullOrWhiteSpace(category) && category != "all")
-            q = q.Where(p => p.Category.ToString().ToLower() == category.ToLower());
+        {
+            var normalizedCategory = Category.ToSlug(category);
+            q = q.Where(p => p.Category.ToLower() == normalizedCategory);
+        }
 
         if (!string.IsNullOrWhiteSpace(query))
             q = q.Where(p => p.Name.Contains(query) || p.Description.Contains(query));
@@ -65,9 +71,11 @@ public class ProductRepository(AppDbContext db)
         var product = await _db.Products.FindAsync([productId], ct);
         if (product == null) return [];
 
+        var productCategory = product.Category.ToLower();
+
         return await _db.Products
             .Include(p => p.Images)
-            .Where(p => p.IsActive && p.Id != productId && p.Category == product.Category)
+            .Where(p => p.IsActive && p.Id != productId && p.Category.ToLower() == productCategory)
             .Take(count)
             .ToListAsync(ct);
     }
@@ -76,7 +84,10 @@ public class ProductRepository(AppDbContext db)
     {
         var q = _db.Products.Where(p => p.IsActive);
         if (!string.IsNullOrWhiteSpace(category) && category != "all")
-            q = q.Where(p => p.Category.ToString().ToLower() == category.ToLower());
+        {
+            var normalizedCategory = Category.ToSlug(category);
+            q = q.Where(p => p.Category.ToLower() == normalizedCategory);
+        }
         if (!string.IsNullOrWhiteSpace(query))
             q = q.Where(p => p.Name.Contains(query));
         return await q.CountAsync(ct);

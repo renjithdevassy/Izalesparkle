@@ -1,11 +1,16 @@
 @inject CartService Cart
 @inject NavigationManager Nav
+@inject WishlistService Wishlist
 
-<div class="product-card" style="animation-delay:@(DelayMs)ms">
+<div class="product-card @(StockLevel <= 0 ? "out-of-stock" : "")" style="animation-delay:@(DelayMs)ms">
     <a href="/product/@Id" class="product-img-link">
         <div class="product-img-wrap">
             <img src="@ImageUrl" alt="@Name" loading="lazy" />
-            @if (!string.IsNullOrEmpty(Badge))
+            @if (StockLevel <= 0)
+            {
+                <span class="product-badge badge-out">Out of Stock</span>
+            }
+            else if (!string.IsNullOrEmpty(Badge))
             {
                 <span class="product-badge badge-@Badge">
                     @(Badge == "new" ? "New In" : Badge == "sale" ? "Sale" : "Best Seller")
@@ -15,9 +20,16 @@
         </div>
     </a>
     <div class="product-card-actions">
-        <button class="prod-add-btn" @onclick="AddToCart">Add to Cart</button>
-        <button class="prod-wish-btn @(IsWishlisted ? "wishlisted" : "")" @onclick="ToggleWish">
-            @(IsWishlisted ? "♥" : "♡")
+        @if (StockLevel > 0)
+        {
+            <button class="prod-add-btn" @onclick="AddToCart">Add to Cart</button>
+        }
+        else
+        {
+            <button class="prod-add-btn btn-disabled" disabled>Out of Stock</button>
+        }
+        <button class="prod-wish-btn @(Wishlist.IsWishlisted(Id) ? "wishlisted" : "")" @onclick="() => Wishlist.ToggleAsync(Id)">
+            @(Wishlist.IsWishlisted(Id) ? "♥" : "♡")
         </button>
     </div>
     <div class="product-card-info">
@@ -27,10 +39,10 @@
         </a>
         <div class="product-material">@Material</div>
         <div class="product-price-row">
-            <span class="product-price">£@Price.ToString("N0")</span>
+            <span class="product-price">£@Price.ToString("N2")</span>
             @if (IsOnSale && OldPrice.HasValue)
             {
-                <span class="product-price-old">£@OldPrice.Value.ToString("N0")</span>
+                <span class="product-price-old">£@OldPrice.Value.ToString("N2")</span>
             }
             @if (IsOnSale && SavePercent.HasValue && SavePercent > 0)
             {
@@ -67,14 +79,14 @@
     string  ImageUrl    => Product?.ImageUrl    ?? Summary?.ImageUrl    ?? "";
     int?    SavePercent => Product?.SavePercent ?? Summary?.SavePercent;
     bool    IsOnSale    => Product?.IsOnSale    ?? Summary?.IsOnSale    ?? false;
+    int     StockLevel  => Product?.StockLevel  ?? Summary?.StockLevel  ?? 0;
     string  StarsDisplay => new string('★', Stars) + new string('☆', 5 - Stars);
 
-    bool IsWishlisted = false;
-    bool ShowToast    = false;
+    bool ShowToast = false;
 
     void AddToCart()
     {
-        // Use local Product if available; otherwise build a minimal one from Summary
+        if (StockLevel <= 0) return;
         var p = Product ?? (Summary == null ? null : new Product
         {
             Id              = Summary.Id,
@@ -88,12 +100,11 @@
             ImageUrl        = Summary.ImageUrl,
             Images          = new List<string> { Summary.ImageUrl },
             IsVatApplicable = Summary.IsVatApplicable,
+            StockLevel      = Summary.StockLevel,
         });
         if (p == null) return;
         Cart.AddItem(p);
         ShowToast = true;
         Task.Delay(2500).ContinueWith(_ => { ShowToast = false; InvokeAsync(StateHasChanged); });
     }
-
-    void ToggleWish() => IsWishlisted = !IsWishlisted;
 }

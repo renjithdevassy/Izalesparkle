@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProductAttribute> ProductAttributes => Set<ProductAttribute>();
     public DbSet<DiscountCode>    DiscountCodes   => Set<DiscountCode>();
     public DbSet<Category>         Categories      => Set<Category>();
+    public DbSet<SiteVisit>        SiteVisits      => Set<SiteVisit>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -63,7 +64,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasIndex(p => p.Slug).IsUnique();
         b.Property(p => p.Description).HasMaxLength(2000);
         b.Property(p => p.Material).HasMaxLength(200);
-        b.Property(p => p.Category).HasConversion<string>();
+        b.Property(p => p.Category).HasMaxLength(100).IsRequired();
         b.Property(p => p.Badge).HasConversion<string?>();
         b.Property(p => p.IsActive).HasDefaultValue(true);
 
@@ -210,5 +211,15 @@ public class ProductAttributeConfiguration : IEntityTypeConfiguration<ProductAtt
         b.Property(a => a.Name).IsRequired().HasMaxLength(100);
         b.Property(a => a.Value).IsRequired().HasMaxLength(500);
         b.Property(a => a.IsEnabled).HasDefaultValue(false);
+    }
+}
+
+public class SiteVisitConfiguration : IEntityTypeConfiguration<SiteVisit>
+{
+    public void Configure(EntityTypeBuilder<SiteVisit> b)
+    {
+        b.HasKey(v => v.Id);
+        b.Property(v => v.Path).HasMaxLength(300);
+        b.HasIndex(v => v.CreatedAt);
     }
 }

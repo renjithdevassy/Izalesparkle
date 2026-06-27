@@ -1,0 +1,24 @@
+# ── Build output ──────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+
+# ── Visual Studio / Rider / VS Code ───────────────────────────
+.vs/
+.idea/
+*.suo
+*.userprefs
+
+# ── ASP.NET runtime data ──────────────────────────────────────
+App_Data/
+*.log
+
+# ── Runtime-uploaded content (regenerated per environment) ────
+IzaleSparkle.Server/wwwroot/uploads/
+
+# ── Local SQLite (if used) ────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal

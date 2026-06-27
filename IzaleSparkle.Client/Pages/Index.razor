@@ -1,50 +1,36 @@
 @page "/"
 @inject IApiClient Api
 @inject ProductService FallbackSvc
+@inject IJSRuntime JS
 
 <PageTitle>Izale Sparkle — Where Every Look Sparkles | Fine Jewellery UK</PageTitle>
 
-<SeoMeta 
-    IsHomepage="true"
-/>
+<SeoMeta IsHomepage="true" />
 
-<!-- ══ HERO ══ -->
-<section class="hero">
-    <div class="hero-content">
-        <div class="hero-eyebrow">
-            <div class="eyebrow-line"></div>
-            <span>New Sparkle Collection — 2026</span>
-        </div>
-        <h1 class="hero-title">
-            <span class="hero-script">Where Every</span>
-            Look <em>Sparkles.</em>
-        </h1>
-        <p class="hero-desc">Exquisite imitation jewellery inspired by Indian artistry, crafted for the woman who knows every outfit deserves to shine.</p>
-        <div class="hero-btns">
-            <a href="/shop" class="btn btn-dark btn-full-mobile">Shop Collection</a>
-        </div>
-        <div class="hero-stats">
-            <div class="stat"><div class="stat-num">50+</div><div class="stat-label">Unique Pieces</div></div>
-            <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Happy Clients</div></div>
-            <div class="stat"><div class="stat-num">100%</div><div class="stat-label">Conflict-Free</div></div>
-        </div>
-    </div>
-    <div class="hero-img-mobile">
-        <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=900&q=85" alt="Izale Sparkle Fine Jewellery" loading="eager" fetchpriority="high" />
-        <div class="hero-img-mobile-overlay"></div>
-    </div>
-    <div class="hero-img-side">
-        <div class="hero-img-frame">
-            <img src="https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=900&q=85" alt="Izale Sparkle Fine Jewellery" loading="eager" />
-            <div class="hero-sparkles">
-                <span class="sparkle-dot s1">✦</span>
-                <span class="sparkle-dot s2">✦</span>
-                <span class="sparkle-dot s3">✦</span>
-                <span class="sparkle-dot s4">✦</span>
-            </div>
-        </div>
-    </div>
+<!-- ══ COMPACT HEADER ══ -->
+<section class="page-hero" style="min-height:26vh">
+    <span class="page-hero-tag">✦ Fine Imitation Jewellery · UK ✦</span>
+    <h1 class="page-hero-title">Where Every Look <em>Sparkles</em></h1>
+    <p class="page-hero-sub">Imitation jewellery inspired by Indian artistry — because every outfit deserves to shine.</p>
 </section>
+
+<!-- ══ PROMO / DISCOUNT ADVERTISEMENT ══ -->
+<div class="promo-banner reveal">
+    <div class="promo-inner">
+        <div class="promo-text">
+            <span class="promo-eyebrow">✦ Limited Time Offer ✦</span>
+            <h2 class="promo-title">Get <em>10% Off</em> Your Order</h2>
+            <p class="promo-sub">Apply the code at checkout and let every look sparkle for less.</p>
+        </div>
+        <div class="promo-action">
+            <button class="promo-code" @onclick="CopyPromo" title="Click to copy code">
+                <span class="promo-code-label">@(PromoCopied ? "✓ Copied!" : "Tap to copy")</span>
+                <span class="promo-code-value">SPARKLE10</span>
+            </button>
+            <a href="/shop" class="btn btn-gold">Shop Now</a>
+        </div>
+    </div>
+</div>
 
 <!-- ══ MARQUEE ══ -->
 <div class="marquee-bar" aria-hidden="true">
@@ -55,15 +41,15 @@
             <span class="marquee-sep">✦</span>
         }
     </div>
- </div>
+</div>
 
 <!-- ══ FEATURED PRODUCTS ══ -->
 <section class="section bg-white">
-    <div class="section-head">
-        <span class="section-tag">✦ Featured ✦</span>
-        <h2 class="section-title">New <em>Arrivals</em></h2>
+    <div class="section-head reveal">
+        <span class="section-tag">✦ Shop Now ✦</span>
+        <h2 class="section-title">Our <em>Pieces</em></h2>
         <div class="sparkle-divider"><span>✦</span></div>
- @*        <p class="section-subtitle">Each piece handcrafted with conflict-free stones and 18K gold.</p> *@
+        <p class="section-subtitle">Handpicked pieces inspired by Indian artistry — each one crafted to turn heads.</p>
     </div>
     @if (Loading)
     {
@@ -80,23 +66,60 @@
             }
         </div>
         <div class="section-cta">
-            <a href="/shop" class="btn btn-outline">View All Pieces</a>
+            <a href="/shop" class="btn btn-dark">View All Pieces</a>
         </div>
     }
 </section>
 
+<!-- ══ USP BAR ══ -->
+<div class="usp-bar">
+    <div class="usp-item reveal">
+        <div class="usp-icon">🔁</div>
+        <div class="usp-title">Easy Returns</div>
+        <div class="usp-desc">30-day hassle-free returns</div>
+    </div>
+    <div class="usp-item reveal">
+        <div class="usp-icon">💎</div>
+        <div class="usp-title">Quality Assured</div>
+        <div class="usp-desc">Every piece handpicked &amp; inspected</div>
+    </div>
+    <div class="usp-item reveal">
+        <div class="usp-icon">🪙</div>
+        <div class="usp-title">Affordable Indian Jewellery</div>
+        <div class="usp-desc">Authentic craftsmanship, UK prices</div>
+    </div>
+    <div class="usp-item reveal">
+        <div class="usp-icon">✨</div>
+        <div class="usp-title">Exciting New Arrivals</div>
+        <div class="usp-desc">Fresh styles added regularly</div>
+    </div>
+</div>
+
+<!-- ══ EDITORIAL STRIP ══ -->
+<div class="editorial-strip">
+    <div class="editorial-img reveal-left">
+        <img src="https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=900&q=80" alt="Izale Sparkle craftsmanship" loading="lazy" />
+    </div>
+    <div class="editorial-content reveal-right">
+        <p class="editorial-tag">Our Promise</p>
+        <h2 class="editorial-title">Indian Artistry.<br /><em>Modern Elegance.</em></h2>
+        <p class="editorial-body">Rooted in the rich tradition of Indian jewellery craftsmanship, every Izale Sparkle piece is carefully curated to bring you timeless beauty at an accessible price — so you can shine at every occasion.</p>
+        <a href="/shop" class="btn btn-outline-light">Explore the Collection</a>
+    </div>
+</div>
+
 <!-- ══ TESTIMONIALS ══ -->
 <section class="section bg-cream">
-    <div class="section-head">
-        <span class="section-tag">✦ Reviews ✦</span>
-        <h2 class="section-title">She Said <em>Sparkle</em></h2>
+    <div class="section-head reveal">
+        <span class="section-tag">✦ Customer Reviews ✦</span>
+        <h2 class="section-title">What Our Clients <em>Say</em></h2>
         <div class="sparkle-divider"><span>✦</span></div>
     </div>
     <div class="testi-scroll">
         <div class="testi-grid">
             @foreach (var t in Testimonials)
             {
-                <div class="testi-card">
+                <div class="testi-card reveal">
                     <div class="testi-stars">★★★★★</div>
                     <div class="testi-quote">"</div>
                     <div class="testi-text">@t.Text</div>
@@ -108,9 +131,9 @@
 </section>
 
 <!-- ══ NEWSLETTER ══ -->
-<div class="newsletter-strip">
+<div class="newsletter-strip reveal">
     <h3>Join the <em>Sparkle</em> Circle</h3>
-    <p>Early access to new arrivals, exclusive events &amp; jewellery care tips.</p>
+    <p>Be the first to hear about new arrivals, exclusive offers &amp; jewellery style tips.</p>
     <div class="newsletter-form">
         <input class="newsletter-input" type="email" inputmode="email" autocomplete="email"
                placeholder="Your email address" @bind="EmailInput" />
@@ -124,39 +147,53 @@
 
 @code {
     bool Loading = true;
+    bool PromoCopied = false;
     List<ProductSummaryResponse> Featured = new();
     string EmailInput = "";
     string SubscribeMsg = "";
 
+    async Task CopyPromo()
+    {
+        try { await JS.InvokeAsync<bool>("copyToClipboard", "SPARKLE10"); } catch { }
+        PromoCopied = true;
+        StateHasChanged();
+        await Task.Delay(2000);
+        PromoCopied = false;
+    }
+
     record TestiItem(string Text, string Author);
 
     List<string> MarqueeItems = new()
-    { "Izale Sparkle","Izale Sparkle","Izale Sparkle","Izale Sparkle" };
+    {
+        "Handcrafted Jewellery", "UK Based", "Conflict-Free Stones",
+        "Indian Artistry", "Modern Elegance", "Affordable Indian Jewellery", "Exciting New Arrivals"
+    };
 
     List<TestiItem> Testimonials = new()
     {
         new("Simple and elegant. The quality feels really good for the price.", "Lakshmi Prasad, United Kingdom"),
         new("Very nice shine and neat design. Happy with the quality.", "Julie Koshy, United Kingdom"),
-        
     };
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // ── API CALL ──────────────────────────────────────────
-            var result = await Api.GetFeaturedAsync(4);
+            var result = await Api.GetFeaturedAsync(24);
             Featured = result?.ToList() ?? new();
         }
-        catch
+        catch { }
+
+        // Fall back to the local product list if the API returned nothing.
+        if (!Featured.Any())
         {
-            // Offline / API unavailable — fall back to in-memory data
-            Featured = FallbackSvc.GetFeatured(4)
-                .Select(p => new ProductSummaryResponse(p.Id, p.Name, p.Name.ToLower().Replace(" ","-"),
+            Featured = FallbackSvc.GetFeatured(24)
+                .Select(p => new ProductSummaryResponse(p.Id, p.Name, p.Name.ToLower().Replace(" ", "-"),
                     p.Material, p.Price, p.OldPrice, p.Category, p.Badge,
                     p.Stars, p.ImageUrl, p.IsOnSale, p.SavePercent)).ToList();
         }
-        finally { Loading = false; }
+
+        Loading = false;
     }
 
     async Task SubscribeAsync()
@@ -164,7 +201,6 @@
         if (string.IsNullOrWhiteSpace(EmailInput)) return;
         try
         {
-            // ── API CALL ──────────────────────────────────────────
             var result = await Api.SubscribeAsync(EmailInput);
             SubscribeMsg = result?.Data?.Message ?? "✦ Welcome to the Sparkle Circle!";
         }

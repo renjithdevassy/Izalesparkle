@@ -161,7 +161,7 @@ internal static class StockMapper
     internal static StockLevelResponse ToLevel(Product p) => new(
         ProductId:      p.Id,
         ProductName:    p.Name,
-        Category:       p.Category.ToString().ToLower(),
+        Category:       Category.ToSlug(p.Category),
         ImageUrl:       p.ImageUrl,
         StockLevel:     p.StockLevel,
         ReorderPoint:   p.ReorderPoint,

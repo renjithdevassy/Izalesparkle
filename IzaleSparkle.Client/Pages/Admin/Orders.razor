@@ -19,9 +19,9 @@
     <div class="admin-stats-grid" style="grid-template-columns:repeat(4,1fr)">
         <div class="admin-stat-card gold">
             <div class="asc-icon">💷</div>
-            <div class="asc-num">£@Report.TotalRevenue.ToString("N0")</div>
+            <div class="asc-num">£@Report.TotalRevenue.ToString("N2")</div>
             <div class="asc-label">Total Revenue</div>
-            <div class="asc-sub">£@Report.TodayRevenue.ToString("N0") today</div>
+            <div class="asc-sub">£@Report.TodayRevenue.ToString("N2") today</div>
         </div>
         <div class="admin-stat-card">
             <div class="asc-icon">⏳</div>
@@ -48,12 +48,13 @@
         @foreach (var s in Statuses)
         {
             var count = s.Key switch {
-                "Pending"         => Report.PendingOrders,
-                "Processing"      => Report.ProcessingOrders,
-                "Shipped"         => Report.ShippedOrders,
-                "Delivered"       => Report.DeliveredOrders,
-                "Cancelled"       => Report.CancelledOrders,
-                _                 => 0
+                "Pending"            => Report.PendingOrders,
+                "Processing"         => Report.ProcessingOrders,
+                "ReadyForCollection" => Report.CollectionReadyOrders,
+                "Shipped"            => Report.ShippedOrders,
+                "Delivered"          => Report.DeliveredOrders,
+                "Cancelled"          => Report.CancelledOrders,
+                _                    => 0
             };
             <button class="order-pipeline-step @(StatusFilter == s.Key ? "active" : "")"
                     @onclick="() => FilterByStatus(s.Key)">
@@ -168,13 +169,14 @@ else if (Report != null)
     record StatusDef(string icon);
     Dictionary<string, StatusDef> Statuses = new()
     {
-        ["Pending"]        = new("⏳"),
-        ["PaymentReceived"]= new("💳"),
-        ["Processing"]     = new("⚙️"),
-        ["Shipped"]        = new("🚚"),
-        ["Delivered"]      = new("✅"),
-        ["Cancelled"]      = new("❌"),
-        ["Refunded"]       = new("↩️"),
+        ["Pending"]            = new("⏳"),
+        ["PaymentReceived"]    = new("💳"),
+        ["Processing"]         = new("⚙️"),
+        ["ReadyForCollection"] = new("📦"),
+        ["Shipped"]            = new("🚚"),
+        ["Delivered"]          = new("✅"),
+        ["Cancelled"]          = new("❌"),
+        ["Refunded"]           = new("↩️"),
     };
 
     protected override async Task OnInitializedAsync() => await LoadOrders();

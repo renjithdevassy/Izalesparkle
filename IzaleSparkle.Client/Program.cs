@@ -14,6 +14,7 @@ builder.Services.AddScoped(sp =>
 // Core in-memory services (Singleton — no scoped deps)
 builder.Services.AddSingleton<CartService>();
 builder.Services.AddSingleton<ProductService>();
+builder.Services.AddSingleton<WishlistService>();
 
 // AuthService — Singleton is correct for auth state, but it must NOT
 // depend on Scoped services (HttpClient, IJSRuntime) in its constructor.
@@ -25,10 +26,11 @@ builder.Services.AddScoped<IApiClient, ApiClient>();
 
 var host = builder.Build();
 
-// Restore auth session from localStorage before first render.
-// We resolve IJSRuntime from the root scope — safe at startup.
-var auth = host.Services.GetRequiredService<AuthService>();
-var js   = host.Services.GetRequiredService<Microsoft.JSInterop.IJSRuntime>();
+// Restore auth session and wishlist from localStorage before first render.
+var auth      = host.Services.GetRequiredService<AuthService>();
+var wishlist  = host.Services.GetRequiredService<WishlistService>();
+var js        = host.Services.GetRequiredService<Microsoft.JSInterop.IJSRuntime>();
 await auth.InitialiseAsync(js);
+await wishlist.InitialiseAsync(js);
 
 await host.RunAsync();

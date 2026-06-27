@@ -3,7 +3,10 @@
 @inject IApiClient Api
 
 <div class="admin-page-header">
-    <h1 class="admin-page-title">Dashboard</h1>
+    <div>
+        <h1 class="admin-page-title">Dashboard</h1>
+        <p class="admin-page-sub">@DateTime.Now.ToString("dddd, dd MMMM yyyy")</p>
+    </div>
     <a href="/admin/products/new" class="btn btn-gold" style="font-size:.68rem">+ New Product</a>
 </div>
 
@@ -13,32 +16,129 @@
 }
 else if (Data != null)
 {
-    <!-- STAT CARDS -->
-    <div class="admin-stats-grid">
-        <div class="admin-stat-card">
-            <div class="asc-icon">💎</div>
-            <div class="asc-num">@Data.TotalProducts</div>
-            <div class="asc-label">Total Products</div>
-            <div class="asc-sub">@Data.ActiveProducts active</div>
+    <!-- HERO REVENUE + PRIMARY KPIs -->
+    <div class="dash-grid">
+        <!-- Featured revenue card -->
+        <div class="dash-revenue-card">
+            <div class="drc-top">
+                <span class="drc-label">Net Revenue</span>
+                <span class="drc-pill">Excl. cancelled</span>
+            </div>
+            <div class="drc-amount">£@Data.TotalRevenue.ToString("N2")</div>
+            <div class="drc-foot">
+                <div class="drc-foot-item">
+                    <span class="drc-foot-num">£@Data.TodayRevenue.ToString("N2")</span>
+                    <span class="drc-foot-label">Today</span>
+                </div>
+                <div class="drc-foot-divider"></div>
+                <div class="drc-foot-item">
+                    <span class="drc-foot-num">£@Data.AverageOrderValue.ToString("N2")</span>
+                    <span class="drc-foot-label">Avg. order</span>
+                </div>
+            </div>
         </div>
-        <div class="admin-stat-card">
-            <div class="asc-icon">📦</div>
-            <div class="asc-num">@Data.TotalOrders</div>
-            <div class="asc-label">Total Orders</div>
-            <div class="asc-sub">@Data.PendingOrders pending</div>
+
+        <!-- KPI tiles -->
+        <div class="dash-kpis">
+            <div class="dash-kpi">
+                <div class="dk-icon">📦</div>
+                <div class="dk-body">
+                    <div class="dk-num">@Data.TotalOrders</div>
+                    <div class="dk-label">Total Orders</div>
+                </div>
+                <div class="dk-tag">@Data.PendingOrders pending</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dk-icon">💎</div>
+                <div class="dk-body">
+                    <div class="dk-num">@Data.TotalProducts</div>
+                    <div class="dk-label">Products</div>
+                </div>
+                <div class="dk-tag">@Data.ActiveProducts active</div>
+            </div>
+            <div class="dash-kpi">
+                <div class="dk-icon">✅</div>
+                <div class="dk-body">
+                    <div class="dk-num">@Data.DeliveredOrders</div>
+                    <div class="dk-label">Delivered</div>
+                </div>
+                <div class="dk-tag">Completed</div>
+            </div>
+            <div class="dash-kpi @(Data.LowStockCount > 0 ? "alert" : "")">
+                <div class="dk-icon">@(Data.LowStockCount > 0 ? "⚠️" : "🏷️")</div>
+                <div class="dk-body">
+                    <div class="dk-num">@Data.LowStockCount</div>
+                    <div class="dk-label">Low Stock</div>
+                </div>
+                <a href="/admin/stock" class="dk-tag link">Review →</a>
+            </div>
+            <div class="dash-kpi">
+                <div class="dk-icon">👁️</div>
+                <div class="dk-body">
+                    <div class="dk-num">@Data.TotalViews.ToString("N0")</div>
+                    <div class="dk-label">Website Views</div>
+                </div>
+                <div class="dk-tag">@Data.TodayViews.ToString("N0") today</div>
+            </div>
         </div>
-        <div class="admin-stat-card gold">
-            <div class="asc-icon">💷</div>
-            <div class="asc-num">£@Data.TotalRevenue.ToString("N0")</div>
-            <div class="asc-label">Total Revenue</div>
-            <div class="asc-sub">All time</div>
+    </div>
+
+    <!-- ATTENTION STRIP -->
+    <div class="dash-strip">
+        <div class="dash-strip-item">
+            <span class="dsi-dot pending"></span>
+            <span class="dsi-num">@Data.PendingOrders</span>
+            <span class="dsi-label">Pending</span>
         </div>
-        <div class="admin-stat-card">
-            <div class="asc-icon">🏷️</div>
-            <div class="asc-num">4</div>
-            <div class="asc-label">Categories</div>
-            <div class="asc-sub">Rings, Necklaces, Earrings, Bracelets</div>
+        <div class="dash-strip-item">
+            <span class="dsi-dot delivered"></span>
+            <span class="dsi-num">@Data.DeliveredOrders</span>
+            <span class="dsi-label">Delivered</span>
         </div>
+        <div class="dash-strip-item">
+            <span class="dsi-dot cancelled"></span>
+            <span class="dsi-num">@Data.CancelledOrders</span>
+            <span class="dsi-label">Cancelled</span>
+        </div>
+        <div class="dash-strip-item">
+            <span class="dsi-dot category"></span>
+            <span class="dsi-num">@CategoryCount</span>
+            <span class="dsi-label">Categories</span>
+        </div>
+    </div>
+
+    <!-- RECENT ORDERS -->
+    <div class="admin-section">
+        <div class="admin-section-head">
+            <h2>Recent Orders</h2>
+            <a href="/admin/orders" class="admin-link">View all →</a>
+        </div>
+        @if (Data.RecentOrders.Any())
+        {
+            <div class="admin-table-wrap">
+                <table class="admin-table">
+                    <thead>
+                        <tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var o in Data.RecentOrders)
+                        {
+                            <tr>
+                                <td><span class="admin-order-num">@o.OrderNumber</span></td>
+                                <td>@o.CustomerEmail</td>
+                                <td><span class="admin-price">£@o.Total.ToString("N2")</span></td>
+                                <td><span class="order-status-chip @o.Status.ToLower()">@o.Status</span></td>
+                                <td>@o.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="admin-empty">No orders yet.</div>
+        }
     </div>
 
     <!-- RECENT PRODUCTS -->
@@ -73,10 +173,10 @@ else if (Data != null)
                             </td>
                             <td><span class="admin-badge-chip">@p.Category</span></td>
                             <td>
-                                <div class="admin-price">£@p.Price.ToString("N0")</div>
+                                <div class="admin-price">£@p.Price.ToString("N2")</div>
                                 @if (p.OldPrice.HasValue)
                                 {
-                                    <div class="admin-price-old">£@p.OldPrice.Value.ToString("N0")</div>
+                                    <div class="admin-price-old">£@p.OldPrice.Value.ToString("N2")</div>
                                 }
                             </td>
                             <td>
@@ -93,45 +193,29 @@ else if (Data != null)
             </table>
         </div>
     </div>
-
-    <!-- RECENT ORDERS -->
-    @if (Data.RecentOrders.Any())
-    {
-        <div class="admin-section">
-            <div class="admin-section-head">
-                <h2>Recent Orders</h2>
-            </div>
-            <div class="admin-table-wrap">
-                <table class="admin-table">
-                    <thead>
-                        <tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var o in Data.RecentOrders)
-                        {
-                            <tr>
-                                <td><span class="admin-order-num">@o.OrderNumber</span></td>
-                                <td>@o.CustomerEmail</td>
-                                <td>£@o.Total.ToString("N0")</td>
-                                <td><span class="order-status-chip @o.Status.ToLower()">@o.Status</span></td>
-                                <td>@o.CreatedAt.ToString("dd MMM yyyy")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
 }
 
 @code {
     bool Loading = true;
     AdminDashboardResponse? Data;
+    int CategoryCount = 0;
+    string CategoryNames = "";
 
     protected override async Task OnInitializedAsync()
     {
-        try   { Data = await Api.GetDashboardAsync(); }
+        try { Data = await Api.GetDashboardAsync(); }
         catch { }
+        try
+        {
+            var cats = await Api.GetAdminCategoriesAsync();
+            if (cats != null)
+            {
+                var activeCats = cats.Where(c => c.IsActive).ToList();
+                CategoryCount = activeCats.Count;
+                CategoryNames = string.Join(", ", activeCats.Select(c => c.Name));
+            }
+        }
+        catch { CategoryNames = ""; }
         finally { Loading = false; }
     }
 }

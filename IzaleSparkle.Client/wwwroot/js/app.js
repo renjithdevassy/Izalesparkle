@@ -39,10 +39,15 @@ window.initCursor = function () {
 
 // ── SCROLL REVEAL ─────────────────────────────────────────────
 window.initScrollReveal = function () {
+    // Disconnect any previous observer so repeated calls (after navigation) don't pile up.
+    if (window._revealObs) window._revealObs.disconnect();
     const obs = new IntersectionObserver(entries => {
         entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } });
     }, { threshold: 0.06, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal,.reveal-left,.reveal-right').forEach(el => obs.observe(el));
+    // Only observe elements that haven't been revealed yet.
+    document.querySelectorAll('.reveal:not(.visible),.reveal-left:not(.visible),.reveal-right:not(.visible)')
+        .forEach(el => obs.observe(el));
+    window._revealObs = obs;
 };
 
 // ── NAVBAR SCROLL SHADOW ──────────────────────────────────────

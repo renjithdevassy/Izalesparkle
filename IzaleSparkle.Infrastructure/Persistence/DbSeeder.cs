@@ -13,11 +13,17 @@ public static class DbSeeder
     {
         await db.Database.EnsureCreatedAsync();
 
+        // The schema is created via EnsureCreated, which does NOT add new tables to an
+        // already-existing database. Guard-create tables added after the first deploy so
+        // existing production databases pick them up without a full migration.
+        await EnsureSiteVisitsTableAsync(db);
+
         // Seed admin user
         if (!await db.Users.AnyAsync(u => u.Role == UserRole.Admin))
         {
             var adminEmail    = config?["AdminSeed:Email"]     ?? "admin@izalesparkle.com";
-            var adminPassword = config?["AdminSeed:Password"]  ?? "Admin@123!";
+            var adminPassword = config?["AdminSeed:Password"];
+            if (string.IsNullOrWhiteSpace(adminPassword)) adminPassword = "Admin@123!";
             var adminFirst    = config?["AdminSeed:FirstName"] ?? "Izale";
             var adminLast     = config?["AdminSeed:LastName"]  ?? "Admin";
             var hash          = global::BCrypt.Net.BCrypt.HashPassword(adminPassword, workFactor: 12);
@@ -26,7 +32,30 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
-        if (await db.Products.AnyAsync()) return;
+        // Seed default categories without removing custom admin-created categories.
+        if (!await db.Categories.AnyAsync())
+        {
+            db.Categories.AddRange(DefaultCategories());
+            await db.SaveChangesAsync();
+        }
+
+        // Normalize legacy enum-style product categories ("Rings") to slugs ("rings")
+        // while preserving custom categories added in the admin panel.
+        var existingProducts = await db.Products.ToListAsync();
+        foreach (var product in existingProducts)
+        {
+            var normalized = Category.ToSlug(product.Category);
+            if (!product.Category.Equals(normalized, StringComparison.Ordinal))
+                product.UpdateCategory(normalized);
+        }
+        if (existingProducts.Any())
+            await db.SaveChangesAsync();
+
+        if (await db.Products.AnyAsync())
+        {
+            await SeedDiscountCodesAsync(db);
+            return;
+        }
 
         var products = new[]
         {
@@ -36,70 +65,70 @@ public static class DbSeeder
                 "Our most iconic ring — a 1.2ct GIA-certified brilliant-cut diamond in a signature four-claw setting. Handcrafted in solid 18K gold with free engraving.",
                 3850, ProductCategory.Rings, 5, BadgeType.New, null,
                 "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=600&q=80",
-                Imgs("1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
+                Imgs("1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
 
             Make("Eternity Diamond Band",
                 "18K Yellow Gold & Full Pavé Diamonds",
                 "A full eternity band featuring pavé-set diamonds all the way around. The ultimate symbol of endless love.",
                 4200, ProductCategory.Rings, 5, BadgeType.New, null,
-                "https://images.unsplash.com/photo-1573408301185-9519f94bf22b?w=600&q=80",
-                Imgs("1573408301185-9519f94bf22b","1605100804763-247f67b3557e","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
+                "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80",
+                Imgs("1535632066927-ab7c9ab60908","1605100804763-247f67b3557e","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
 
             Make("Sapphire Cocktail Ring",
                 "18K White Gold & Ceylon Sapphire",
                 "A statement cocktail ring featuring a deep blue Ceylon sapphire surrounded by a halo of brilliant-cut diamonds.",
                 5600, ProductCategory.Rings, 5, BadgeType.Bestseller, null,
                 "https://images.unsplash.com/photo-1602173574767-37ac01994b2a?w=600&q=80",
-                Imgs("1602173574767-37ac01994b2a","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
+                Imgs("1602173574767-37ac01994b2a","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1515562141207-7a88fb7ce338","1617038260897-41a1f14a8ca0")),
 
             Make("Ruby Cluster Ring",
                 "18K Rose Gold & Burmese Rubies",
                 "A stunning cluster of vivid Burmese rubies and diamonds in 18K rose gold. Bold, beautiful, and utterly unique.",
                 3200, ProductCategory.Rings, 5, BadgeType.Sale, 3900m,
                 "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=600&q=80",
-                Imgs("1515562141207-7a88fb7ce338","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1515562141207-7a88fb7ce338","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             Make("Rose Gold Diamond Ring",
                 "18K Rose Gold & 0.8ct Diamond",
                 "A delicate rose gold band cradling a round brilliant diamond. Modern romance at its finest.",
                 2850, ProductCategory.Rings, 4, null, null,
                 "https://images.unsplash.com/photo-1589207212797-cfd578532af8?w=600&q=80",
-                Imgs("1589207212797-cfd578532af8","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1589207212797-cfd578532af8","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             Make("Emerald Three Stone Ring",
                 "18K Platinum & Colombian Emeralds",
                 "Three matched Colombian emeralds set in platinum. A trio of colour and brilliance for the woman who commands attention.",
                 6800, ProductCategory.Rings, 5, BadgeType.New, null,
                 "https://images.unsplash.com/photo-1617038260897-41a1f14a8ca0?w=600&q=80",
-                Imgs("1617038260897-41a1f14a8ca0","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338")),
+                Imgs("1617038260897-41a1f14a8ca0","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1515562141207-7a88fb7ce338")),
 
             Make("Princess Cut Engagement Ring",
                 "18K White Gold & Princess Cut Diamond",
                 "A princess-cut diamond of exceptional clarity, set in a modern tension-inspired platinum mount. For the bold and the brilliant.",
                 7200, ProductCategory.Rings, 5, BadgeType.New, null,
                 "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80",
-                Imgs("1535632066927-ab7c9ab60908","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1535632066927-ab7c9ab60908","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             Make("Vintage Art Deco Ring",
                 "18K Yellow Gold & Old Cut Diamonds",
                 "Inspired by the golden age of Art Deco, this ring features old-cut diamonds in a geometric milgrain setting. Timeless glamour.",
                 4100, ProductCategory.Rings, 5, null, null,
                 "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=600&q=80",
-                Imgs("1611591437281-460bfbe1220a","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1611591437281-460bfbe1220a","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             Make("Aquamarine Halo Ring",
                 "18K White Gold & Aquamarine",
                 "A sea-blue aquamarine ringed by a halo of white diamonds. Cool, crisp and effortlessly sophisticated.",
                 2400, ProductCategory.Rings, 4, BadgeType.Sale, 2900m,
                 "https://images.unsplash.com/photo-1608042314453-ae338d9c6ad1?w=600&q=80",
-                Imgs("1608042314453-ae338d9c6ad1","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1608042314453-ae338d9c6ad1","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             Make("Gold Stackable Band Set",
                 "18K Yellow Gold — Set of 3",
                 "Three delicate 18K yellow gold bands designed to be worn together or separately. Mix and match for a personalised look.",
                 1650, ProductCategory.Rings, 5, null, null,
                 "https://images.unsplash.com/photo-1506630448388-4e683c67ddb0?w=600&q=80",
-                Imgs("1506630448388-4e683c67ddb0","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
+                Imgs("1506630448388-4e683c67ddb0","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1602173574767-37ac01994b2a","1617038260897-41a1f14a8ca0")),
 
             // ── NECKLACES (8) ────────────────────────────────────
             Make("Sapphire Pendant Necklace",
@@ -148,8 +177,8 @@ public static class DbSeeder
                 "18K Rose Gold & Diamond",
                 "A heart-shaped pendant traced in pavé diamonds on an 18K rose gold chain. The perfect expression of love.",
                 1620, ProductCategory.Necklaces, 4, BadgeType.Sale, 2000m,
-                "https://images.unsplash.com/photo-1573408301185-9519f94bf22b?w=600&q=80",
-                Imgs("1573408301185-9519f94bf22b","1506630448388-4e683c67ddb0","1599643478518-a784e5dc4c8f","1608042314453-ae338d9c6ad1","1617038260897-41a1f14a8ca0")),
+                "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80",
+                Imgs("1535632066927-ab7c9ab60908","1506630448388-4e683c67ddb0","1599643478518-a784e5dc4c8f","1608042314453-ae338d9c6ad1","1617038260897-41a1f14a8ca0")),
 
             Make("Layered Gold Necklace Set",
                 "18K Gold · Set of 2",
@@ -214,7 +243,7 @@ public static class DbSeeder
                 "Solid 18K yellow gold bangle with a polished finish. Timeless elegance that pairs beautifully with any look.",
                 1950, ProductCategory.Bracelets, 5, null, null,
                 "https://images.unsplash.com/photo-1611085583191-a3b181a88401?w=600&q=80",
-                Imgs("1611085583191-a3b181a88401","1611591437281-460bfbe1220a","1605100804763-247f67b3557e","1573408301185-9519f94bf22b","1608042314453-ae338d9c6ad1")),
+                Imgs("1611085583191-a3b181a88401","1611591437281-460bfbe1220a","1605100804763-247f67b3557e","1535632066927-ab7c9ab60908","1608042314453-ae338d9c6ad1")),
 
             Make("Diamond Charm Bracelet",
                 "18K Gold & Diamond Charms",
@@ -234,8 +263,8 @@ public static class DbSeeder
                 "18K Gold & Freshwater Pearls",
                 "A single strand of perfectly matched freshwater pearls on a fine 18K gold clasp. Quietly luxurious.",
                 980, ProductCategory.Bracelets, 4, BadgeType.Sale, 1200m,
-                "https://images.unsplash.com/photo-1573408301185-9519f94bf22b?w=600&q=80",
-                Imgs("1573408301185-9519f94bf22b","1611085583191-a3b181a88401","1611591437281-460bfbe1220a","1608042314453-ae338d9c6ad1","1605100804763-247f67b3557e")),
+                "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=600&q=80",
+                Imgs("1535632066927-ab7c9ab60908","1611085583191-a3b181a88401","1611591437281-460bfbe1220a","1608042314453-ae338d9c6ad1","1605100804763-247f67b3557e")),
 
             Make("Rose Gold Cuff Bracelet",
                 "18K Rose Gold · Open Cuff",
@@ -248,28 +277,54 @@ public static class DbSeeder
         db.Products.AddRange(products);
         await db.SaveChangesAsync();
 
-        // Seed categories
-        if (!db.Categories.Any())
-        {
-            db.Categories.AddRange(
-                new Category { Name="Rings",     Slug="rings",     Description="Engagement rings, eternity bands, cocktail rings", Icon="💍", SortOrder=1, IsActive=true },
-                new Category { Name="Necklaces", Slug="necklaces", Description="Pendants, chains, statement necklaces",             Icon="📿", SortOrder=2, IsActive=true },
-                new Category { Name="Earrings",  Slug="earrings",  Description="Studs, drops, hoops, ear cuffs",                    Icon="✨", SortOrder=3, IsActive=true },
-                new Category { Name="Bracelets", Slug="bracelets", Description="Bangles, tennis bracelets, charm bracelets",         Icon="💎", SortOrder=4, IsActive=true }
-            );
-            await db.SaveChangesAsync();
-        }
+        await SeedDiscountCodesAsync(db);
+    }
 
-        // Seed default discount codes
-        if (!db.DiscountCodes.Any())
+    /// <summary>
+    /// Creates the SiteVisits table on existing databases (EnsureCreated only creates
+    /// tables when the database itself is new). Safe to run repeatedly. SQL Server only.
+    /// </summary>
+    static async Task EnsureSiteVisitsTableAsync(AppDbContext db)
+    {
+        try
         {
-            db.DiscountCodes.AddRange(
-                new DiscountCode { Code="SPARKLE10", Description="10% off — Welcome", DiscountPercent=10, IsActive=true },
-                new DiscountCode { Code="IZALE10",   Description="10% off — Izale code", DiscountPercent=10, IsActive=true },
-                new DiscountCode { Code="WELCOME15", Description="15% off — First order", DiscountPercent=15, IsActive=true, MaxUses=1 }
-            );
-            await db.SaveChangesAsync();
+            await db.Database.ExecuteSqlRawAsync(@"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SiteVisits')
+BEGIN
+    CREATE TABLE [SiteVisits] (
+        [Id]        INT IDENTITY(1,1) NOT NULL CONSTRAINT [PK_SiteVisits] PRIMARY KEY,
+        [Path]      NVARCHAR(300) NULL,
+        [CreatedAt] DATETIME2 NOT NULL,
+        [UpdatedAt] DATETIME2 NULL
+    );
+    CREATE INDEX [IX_SiteVisits_CreatedAt] ON [SiteVisits] ([CreatedAt]);
+END");
         }
+        catch
+        {
+            // Non-fatal: counter is a nice-to-have. If the provider isn't SQL Server
+            // (e.g. tests) or the statement fails, the site still runs normally.
+        }
+    }
+
+    static IEnumerable<Category> DefaultCategories() => new[]
+    {
+        new Category { Name="Rings",     Slug="rings",     Description="Engagement rings, eternity bands, cocktail rings", Icon="💍", SortOrder=1, IsActive=true },
+        new Category { Name="Necklaces", Slug="necklaces", Description="Pendants, chains, statement necklaces",             Icon="📿", SortOrder=2, IsActive=true },
+        new Category { Name="Earrings",  Slug="earrings",  Description="Studs, drops, hoops, ear cuffs",                    Icon="✨", SortOrder=3, IsActive=true },
+        new Category { Name="Bracelets", Slug="bracelets", Description="Bangles, tennis bracelets, charm bracelets",         Icon="💎", SortOrder=4, IsActive=true }
+    };
+
+    static async Task SeedDiscountCodesAsync(AppDbContext db)
+    {
+        if (await db.DiscountCodes.AnyAsync()) return;
+
+        db.DiscountCodes.AddRange(
+            new DiscountCode { Code="SPARKLE10", Description="10% off — Welcome", DiscountPercent=10, IsActive=true },
+            new DiscountCode { Code="IZALE10",   Description="10% off — Izale code", DiscountPercent=10, IsActive=true },
+            new DiscountCode { Code="WELCOME15", Description="15% off — First order", DiscountPercent=15, IsActive=true, MaxUses=1 }
+        );
+        await db.SaveChangesAsync();
     }
 
     static Product Make(
@@ -278,7 +333,7 @@ public static class DbSeeder
         BadgeType? badge, decimal? oldPrice,
         string imageUrl, string[] images)
     {
-        var p = Product.Create(name, desc, material, price, cat, imageUrl, stars, oldPrice, badge);
+        var p = Product.Create(name, desc, material, price, cat.ToString(), imageUrl, stars, oldPrice, badge);
         for (int i = 0; i < images.Length; i++)
             p.AddImage(images[i], i == 0);
         return p;

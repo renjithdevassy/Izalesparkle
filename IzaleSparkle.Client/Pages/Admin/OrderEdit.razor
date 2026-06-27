@@ -160,6 +160,7 @@ else
                         <option value="Pending">⏳ Pending</option>
                         <option value="PaymentReceived">💳 Payment Received</option>
                         <option value="Processing">⚙️ Processing</option>
+                        <option value="ReadyForCollection">📦 Ready for Collection</option>
                         <option value="Shipped">🚚 Shipped</option>
                         <option value="Delivered">✅ Delivered</option>
                         <option value="Cancelled">❌ Cancelled</option>
@@ -402,7 +403,7 @@ else
     string ErrorMsg       = "";
 
     List<string> StatusOrder = new()
-        { "Pending", "PaymentReceived", "Processing", "Shipped", "Delivered" };
+        { "Pending", "PaymentReceived", "Processing", "ReadyForCollection", "Shipped", "Delivered" };
 
     // ── Editable items ───────────────────────────────────────────
     record EditItem(int ProductId, string ProductName, string ImageUrl,
@@ -534,11 +535,12 @@ else
     record QuickAction(string status, string label, string icon);
     List<QuickAction> QuickActions = new()
     {
-        new("PaymentReceived", "Payment Received", "💳"),
-        new("Processing",      "Processing",       "⚙️"),
-        new("Shipped",         "Shipped",          "🚚"),
-        new("Delivered",       "Delivered",        "✅"),
-        new("Cancelled",       "Cancelled",        "❌"),
+        new("PaymentReceived",   "Payment Received",   "💳"),
+        new("Processing",        "Processing",         "⚙️"),
+        new("ReadyForCollection","Ready for Collection","📦"),
+        new("Shipped",           "Shipped",            "🚚"),
+        new("Delivered",         "Delivered",          "✅"),
+        new("Cancelled",         "Cancelled",          "❌"),
     };
 
     // Discount state

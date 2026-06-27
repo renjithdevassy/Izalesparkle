@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using IzaleSparkle.Contracts.Requests;
 using IzaleSparkle.Contracts.Responses;
 
@@ -24,6 +25,8 @@ public interface IApiClient
     Task<ApiResponse<ContactResponse>?> SendContactAsync(ContactRequest req, CancellationToken ct = default);
     // Newsletter
     Task<ApiResponse<NewsletterResponse>?> SubscribeAsync(string email, CancellationToken ct = default);
+    // Analytics
+    Task TrackVisitAsync(string? path = null, CancellationToken ct = default);
     // Auth
     Task<AuthResponse?> RegisterAsync(RegisterRequest req, CancellationToken ct = default);
     Task<AuthResponse?> LoginAsync(LoginRequest req, CancellationToken ct = default);
@@ -33,6 +36,7 @@ public interface IApiClient
     Task<ApiResponse<AdminProductResponse>?> CreateProductAsync(CreateProductRequest req, CancellationToken ct = default);
     Task<ApiResponse<AdminProductResponse>?> UpdateProductAsync(int id, UpdateProductRequest req, CancellationToken ct = default);
     Task<bool> DeleteProductAsync(int id, CancellationToken ct = default);
+    Task<ApiResponse<WhatsAppSyncResponse>?> SyncWhatsAppCatalogAsync(CancellationToken ct = default);
     Task<IEnumerable<CategoryResponse>?> GetAdminCategoriesAsync(CancellationToken ct = default);
     Task<ApiResponse<CategoryResponse>?> CreateCategoryAsync(CreateCategoryRequest req, CancellationToken ct = default);
     Task<ApiResponse<CategoryResponse>?> UpdateCategoryAsync(int id, UpdateCategoryRequest req, CancellationToken ct = default);
@@ -127,7 +131,7 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         PlaceOrderRequest req, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/orders", req, ct);
-        return await response.Content.ReadFromJsonAsync<ApiResponse<OrderResponse>>(cancellationToken: ct);
+        return await ReadApiResponseAsync<OrderResponse>(response, ct);
     }
 
     public async Task<OrderResponse?> GetOrderAsync(string orderNumber, CancellationToken ct = default)
@@ -153,6 +157,20 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         var response = await http.PostAsJsonAsync("api/newsletter/subscribe",
             new NewsletterSubscribeRequest(email), ct);
         return await response.Content.ReadFromJsonAsync<ApiResponse<NewsletterResponse>>(cancellationToken: ct);
+    }
+
+    // ── ANALYTICS ────────────────────────────────────────────────
+    // Fire-and-forget visit tracking — must never disrupt the user experience.
+    public async Task TrackVisitAsync(string? path = null, CancellationToken ct = default)
+    {
+        try
+        {
+            var url = "api/site/track";
+            if (!string.IsNullOrWhiteSpace(path))
+                url += $"?path={Uri.EscapeDataString(path)}";
+            await http.PostAsync(url, null, ct);
+        }
+        catch { /* analytics is best-effort */ }
     }
 
     // ── STOCK ────────────────────────────────────────────────────
@@ -389,9 +407,16 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<ApiResponse<WhatsAppSyncResponse>?> SyncWhatsAppCatalogAsync(CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var response = await http.PostAsync("api/admin/sync-whatsapp", null, ct);
+        return await ReadApiResponseAsync<WhatsAppSyncResponse>(response, ct);
+    }
+
     public async Task<IEnumerable<CategoryResponse>?> GetAdminCategoriesAsync(CancellationToken ct = default)
     {
-        var resp = await http.GetFromJsonAsync<ApiResponse<IEnumerable<CategoryResponse>>>("api/admin/categories", ct);
+        var resp = await http.GetFromJsonAsync<ApiResponse<IEnumerable<CategoryResponse>>>("api/categories", ct);
         return resp?.Data;
     }
     public async Task<ApiResponse<CategoryResponse>?> CreateCategoryAsync(
@@ -427,5 +452,59 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         parts.Add($"page={r.Page}");
         parts.Add($"pageSize={r.PageSize}");
         return string.Join("&", parts);
+    }
+
+    private static async Task<ApiResponse<T>?> ReadApiResponseAsync<T>(
+        HttpResponseMessage response, CancellationToken ct = default)
+    {
+        try
+        {
+            var parsed = await response.Content.ReadFromJsonAsync<ApiResponse<T>>(cancellationToken: ct);
+            if (parsed != null) return parsed;
+        }
+        catch (JsonException)
+        {
+            // Fall through and parse ASP.NET validation problem details below.
+        }
+
+        var text = await response.Content.ReadAsStringAsync(ct);
+        var errors = new List<string>();
+        var message = response.IsSuccessStatusCode ? "Request completed." : "Request failed.";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("message", out var msg) && msg.ValueKind == JsonValueKind.String)
+                message = msg.GetString() ?? message;
+            else if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+                message = title.GetString() ?? message;
+
+            if (root.TryGetProperty("errors", out var errs))
+            {
+                if (errs.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var prop in errs.EnumerateObject())
+                    {
+                        if (prop.Value.ValueKind == JsonValueKind.Array)
+                            errors.AddRange(prop.Value.EnumerateArray()
+                                .Where(x => x.ValueKind == JsonValueKind.String)
+                                .Select(x => x.GetString()!)
+                                .Where(x => !string.IsNullOrWhiteSpace(x)));
+                    }
+                }
+                else if (errs.ValueKind == JsonValueKind.Array)
+                {
+                    errors.AddRange(errs.EnumerateArray()
+                        .Where(x => x.ValueKind == JsonValueKind.String)
+                        .Select(x => x.GetString()!)
+                        .Where(x => !string.IsNullOrWhiteSpace(x)));
+                }
+            }
+        }
+        catch (JsonException) { }
+
+        if (errors.Any()) message = string.Join(" ", errors);
+        return ApiResponse<T>.Fail(message, errors);
     }
 }
