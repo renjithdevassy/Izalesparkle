@@ -53,7 +53,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           # SmarterASP web root. Adjust if your FTP user already lands in the site root.
-          server-dir: /izalesparkle/
+          server-dir: /wwwroot/
           local-dir: ./publish/
           # Only changed files are uploaded (diff sync). State file lives on the server.
           exclude: |
