@@ -35,13 +35,14 @@ public class SitemapController : ControllerBase
         try
         {
             var productList = await _db.Products
-                .Where(p => p.IsActive && p.StockLevel > 0)
-                .Select(p => new { p.Slug, p.UpdatedAt, p.CreatedAt })
+                .Where(p => p.IsActive)
+                .Select(p => new { p.Id, p.UpdatedAt, p.CreatedAt })
                 .ToListAsync();
 
+            // Product pages are routed by integer id (@page "/product/{Id:int}").
             var products = productList.Select(p => new SitemapUrl
             {
-                Loc = $"{BaseUrl}/product/{p.Slug}",
+                Loc = $"{BaseUrl}/product/{p.Id}",
                 Changefreq = "weekly",
                 Priority = "0.8",
                 Lastmod = p.UpdatedAt.HasValue ? p.UpdatedAt.Value.ToString("yyyy-MM-dd") : p.CreatedAt.ToString("yyyy-MM-dd")
