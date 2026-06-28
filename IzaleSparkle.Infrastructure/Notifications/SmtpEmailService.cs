@@ -325,6 +325,49 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
         await SendAsync(email, "Sparkle Circle Member", "Welcome to Izale Sparkle ✦", html, ct);
     }
 
+    // ── PASSWORD RESET ────────────────────────────────────────────
+    public async Task SendPasswordResetAsync(
+        string email, string firstName, string rawToken, CancellationToken ct = default)
+    {
+        var baseUrl = (config["Site:BaseUrl"] ?? "https://izalesparkle.com").TrimEnd('/');
+        var resetLink = $"{baseUrl}/reset-password?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(rawToken)}";
+        var name = string.IsNullOrWhiteSpace(firstName) ? "there" : firstName;
+
+        var html = $"""
+<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width"/></head>
+<body style="margin:0;padding:0;background:#f5f0e1;font-family:'Georgia',serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:30px 20px">
+<tr><td align="center">
+<table width="600" style="background:#fff;max-width:600px;width:100%">
+  <tr><td style="background:#1C1A16;padding:28px 40px;text-align:center">
+    <h1 style="margin:0;color:#C8973A;font-weight:400;font-size:24px;letter-spacing:.25em">Izale ✦ Sparkle</h1>
+  </td></tr>
+  <tr><td style="background:#C8973A;padding:16px 40px;text-align:center">
+    <span style="font-size:28px">🔑</span>
+    <h2 style="margin:4px 0 0;color:#1C1A16;font-weight:400;font-size:18px">Reset Your Password</h2>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="color:#7A6E5F;font-size:14px">Dear {System.Net.WebUtility.HtmlEncode(name)},</p>
+    <p style="color:#1C1A16;font-size:15px;line-height:1.7">We received a request to reset the password for your Izale Sparkle account. Click the button below to choose a new password. This link expires in 60 minutes.</p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="{resetLink}" style="display:inline-block;background:#1C1A16;color:#C8973A;text-decoration:none;padding:14px 32px;font-size:14px;letter-spacing:.1em">Reset Password →</a>
+    </div>
+    <p style="color:#7A6E5F;font-size:12px;line-height:1.7">If the button doesn't work, copy and paste this link into your browser:<br/>
+      <a href="{resetLink}" style="color:#C8973A;word-break:break-all">{resetLink}</a></p>
+    <p style="color:#7A6E5F;font-size:13px;line-height:1.7;margin-top:20px">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+    <p style="font-style:italic;color:#C8973A;font-size:15px;margin-top:24px">Where Every Look Sparkles. ✦</p>
+  </td></tr>
+  <tr><td style="background:#1C1A16;padding:20px 40px;text-align:center">
+    <p style="margin:0;color:rgba(245,240,225,.3);font-size:11px">© 2024 Izale Sparkle · 45 Ryecroft, Haywards Heath, RH16 4NW
+  </td></tr>
+</table></td></tr></table>
+</body></html>
+""";
+
+        await SendAsync(email, name, "🔑 Reset your Izale Sparkle password", html, ct);
+        log.LogInformation("[Email] Password reset link sent → {Email}", email);
+    }
+
     // ── GENERATE PDF (for admin download) ────────────────────────
     public Task<byte[]> GenerateInvoicePdfAsync(OrderEmailData data, CancellationToken ct = default)
     {

@@ -17,6 +17,7 @@ public static class DbSeeder
         // already-existing database. Guard-create tables added after the first deploy so
         // existing production databases pick them up without a full migration.
         await EnsureSiteVisitsTableAsync(db);
+        await EnsurePasswordResetColumnsAsync(db);
 
         // Seed admin user
         if (!await db.Users.AnyAsync(u => u.Role == UserRole.Admin))
@@ -304,6 +305,26 @@ END");
         {
             // Non-fatal: counter is a nice-to-have. If the provider isn't SQL Server
             // (e.g. tests) or the statement fails, the site still runs normally.
+        }
+    }
+
+    /// <summary>
+    /// Adds the password-reset columns to the Users table on existing databases
+    /// (EnsureCreated only creates columns when the table is new). Safe to re-run.
+    /// </summary>
+    static async Task EnsurePasswordResetColumnsAsync(AppDbContext db)
+    {
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(@"
+IF COL_LENGTH('Users', 'PasswordResetTokenHash') IS NULL
+    ALTER TABLE [Users] ADD [PasswordResetTokenHash] NVARCHAR(128) NULL;
+IF COL_LENGTH('Users', 'PasswordResetExpiresAt') IS NULL
+    ALTER TABLE [Users] ADD [PasswordResetExpiresAt] DATETIME2 NULL;");
+        }
+        catch
+        {
+            // Non-fatal — see EnsureSiteVisitsTableAsync.
         }
     }
 

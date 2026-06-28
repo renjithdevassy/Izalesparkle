@@ -183,6 +183,7 @@ public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         b.Property(u => u.LastName).HasMaxLength(100);
         b.Property(u => u.PasswordHash).HasMaxLength(512);
         b.Property(u => u.Role).HasConversion<string>();
+        b.Property(u => u.PasswordResetTokenHash).HasMaxLength(128);
     }
 }
 

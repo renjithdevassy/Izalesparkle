@@ -98,6 +98,17 @@ public record LoginRequest(
     string Password
 );
 
+public record ForgotPasswordRequest(
+    string Email
+);
+
+public record ResetPasswordRequest(
+    string Email,
+    string Token,
+    string NewPassword,
+    string ConfirmPassword
+);
+
 // ── ADMIN: ORDERS ─────────────────────────────────────────────
 public record UpdateOrderStatusRequest(
     int      Id,

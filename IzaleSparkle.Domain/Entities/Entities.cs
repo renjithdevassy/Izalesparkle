@@ -261,6 +261,11 @@ public class AppUser : BaseEntity
     public bool    IsActive      { get; private set; } = true;
     public DateTime? LastLoginAt { get; set; }
 
+    /// <summary>SHA-256 hash of the active password-reset token. The raw token is emailed, never stored.</summary>
+    public string?   PasswordResetTokenHash { get; private set; }
+    /// <summary>UTC expiry of the password-reset token.</summary>
+    public DateTime? PasswordResetExpiresAt { get; private set; }
+
     protected AppUser() { }
 
     public static AppUser Create(string email, string firstName, string lastName,
@@ -276,6 +281,28 @@ public class AppUser : BaseEntity
         };
 
     public string FullName => $"{FirstName} {LastName}";
+
+    /// <summary>Store a hashed, time-limited password-reset token.</summary>
+    public void SetPasswordResetToken(string tokenHash, DateTime expiresAtUtc)
+    {
+        PasswordResetTokenHash = tokenHash;
+        PasswordResetExpiresAt = expiresAtUtc;
+    }
+
+    /// <summary>True if the supplied token hash matches and has not expired.</summary>
+    public bool IsResetTokenValid(string tokenHash)
+        => !string.IsNullOrEmpty(PasswordResetTokenHash)
+           && PasswordResetTokenHash == tokenHash
+           && PasswordResetExpiresAt is { } exp
+           && exp > DateTime.UtcNow;
+
+    /// <summary>Set a new password and invalidate any outstanding reset token.</summary>
+    public void ResetPassword(string newPasswordHash)
+    {
+        PasswordHash           = newPasswordHash;
+        PasswordResetTokenHash = null;
+        PasswordResetExpiresAt = null;
+    }
 }
 
 // ── STOCK PURCHASE ────────────────────────────────────────────

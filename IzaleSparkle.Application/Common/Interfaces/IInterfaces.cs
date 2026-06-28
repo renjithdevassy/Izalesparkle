@@ -65,6 +65,7 @@ public interface IEmailService
     Task<byte[]> GenerateInvoicePdfAsync(OrderEmailData data, CancellationToken ct = default);
     Task SendContactEmailAsync(string from, string name, string subject, string body, CancellationToken ct = default);
     Task SendNewsletterWelcomeAsync(string email, CancellationToken ct = default);
+    Task SendPasswordResetAsync(string email, string firstName, string rawToken, CancellationToken ct = default);
 }
 
 /// <summary>All data needed to render a full order confirmation email.</summary>

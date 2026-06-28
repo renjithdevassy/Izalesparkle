@@ -30,6 +30,8 @@ public interface IApiClient
     // Auth
     Task<AuthResponse?> RegisterAsync(RegisterRequest req, CancellationToken ct = default);
     Task<AuthResponse?> LoginAsync(LoginRequest req, CancellationToken ct = default);
+    Task<AuthMessageResponse?> ForgotPasswordAsync(string email, CancellationToken ct = default);
+    Task<AuthMessageResponse?> ResetPasswordAsync(ResetPasswordRequest req, CancellationToken ct = default);
     // Admin
     Task<AdminDashboardResponse?> GetDashboardAsync(CancellationToken ct = default);
     Task<IEnumerable<AdminProductResponse>?> GetAdminProductsAsync(CancellationToken ct = default);
@@ -370,6 +372,19 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         SetAuthHeader();
         var response = await http.PostAsJsonAsync("api/auth/login", req, ct);
         return await response.Content.ReadFromJsonAsync<AuthResponse>(cancellationToken: ct);
+    }
+
+    public async Task<AuthMessageResponse?> ForgotPasswordAsync(string email, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/auth/forgot-password",
+            new ForgotPasswordRequest(email), ct);
+        return await response.Content.ReadFromJsonAsync<AuthMessageResponse>(cancellationToken: ct);
+    }
+
+    public async Task<AuthMessageResponse?> ResetPasswordAsync(ResetPasswordRequest req, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/auth/reset-password", req, ct);
+        return await response.Content.ReadFromJsonAsync<AuthMessageResponse>(cancellationToken: ct);
     }
 
     // ── ADMIN ────────────────────────────────────────────────────

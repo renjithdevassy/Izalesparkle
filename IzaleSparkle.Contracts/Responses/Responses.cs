@@ -177,6 +177,12 @@ public record AuthResponse(
     string? Message
 );
 
+/// <summary>Simple success/message result for auth flows like password reset.</summary>
+public record AuthMessageResponse(
+    bool   Success,
+    string Message
+);
+
 // ── ADMIN ORDER (full detail) ─────────────────────────────────
 public record AdminOrderResponse(
     int      Id,
