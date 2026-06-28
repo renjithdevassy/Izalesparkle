@@ -1,7 +1,7 @@
 // Izale Sparkle — Production Service Worker
 // Offline-first strategy with cache-then-network for assets
 
-const CACHE_VERSION = 'izale-sparkle-v1';
+const CACHE_VERSION = 'izale-sparkle-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to pre-cache on install
@@ -48,14 +48,19 @@ self.addEventListener('fetch', event => {
   // Skip non-GET
   if (request.method !== 'GET') return;
 
-  // Skip Blazor framework requests — let them pass through
+  // Blazor framework files (boot manifest + assemblies) — NETWORK FIRST so a new
+  // deploy is always picked up. Cache is only a fallback for offline use. Serving
+  // these cache-first would keep running a stale app (missing newly added routes
+  // like /reset-password) even after a deploy.
   if (url.pathname.startsWith('/_framework/')) {
     event.respondWith(
-      caches.match(request).then(cached => cached || fetch(request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_VERSION).then(c => c.put(request, clone));
-        return response;
-      }))
+      fetch(request)
+        .then(response => {
+          const clone = response.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
