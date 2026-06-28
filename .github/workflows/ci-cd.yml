@@ -1,0 +1,66 @@
+name: CI/CD
+
+# Build on every push/PR to main; deploy to SmarterASP.NET only on push to main.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Don't run two deploys at once for the same branch.
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore IzaleSparkle.sln
+
+      # Compiles every project in the solution — this is the CI gate for PRs.
+      - name: Build
+        run: dotnet build IzaleSparkle.sln -c Release --no-restore
+
+      # Produces the deployable hosted Blazor WASM + API output.
+      - name: Publish
+        run: dotnet publish IzaleSparkle.Server/IzaleSparkle.Server.csproj -c Release -o ${{ github.workspace }}/publish --no-restore
+
+      # Downloadable build output (handy for manual deploys / rollback).
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: izalesparkle-publish
+          path: publish/
+          retention-days: 14
+
+      # ── DEPLOY (push to main only) ────────────────────────────────
+      # Config files are excluded so the live host keeps its own real
+      # appsettings (DB connection, Gmail app password, JWT secret).
+      - name: Deploy to SmarterASP.NET via FTP
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:   ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # SmarterASP web root. Adjust if your FTP user already lands in the site root.
+          server-dir: /wwwroot/
+          local-dir: ./publish/
+          # Only changed files are uploaded (diff sync). State file lives on the server.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            appsettings.json
+            appsettings.Development.json
+            appsettings.Production.json
