@@ -27,11 +27,10 @@ jobs:
       - name: Restore
         run: dotnet restore IzaleSparkle.sln
 
-      # Compiles every project in the solution — this is the CI gate for PRs.
-      - name: Build
-        run: dotnet build IzaleSparkle.sln -c Release --no-restore
-
-      # Produces the deployable hosted Blazor WASM + API output.
+      # Publishing the hosted Server project compiles the whole graph (Client WASM +
+      # API + libraries) via the Blazor hosted packaging path and produces the
+      # deployable output. This is the CI gate for PRs and the deploy source.
+      # (A plain `dotnet build` of the .sln trips over MSB3030 on the WASM client.)
       - name: Publish
         run: dotnet publish IzaleSparkle.Server/IzaleSparkle.Server.csproj -c Release -o ${{ github.workspace }}/publish --no-restore
 
