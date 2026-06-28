@@ -52,8 +52,9 @@ jobs:
           server:   ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # SmarterASP requires explicit FTP over TLS (matches FileZilla's setting).
-          protocol: ftps
+          # Plain FTP: SmarterASP's FTPS data channel resets from the GitHub runner
+          # (ECONNRESET on the data socket). Login + transfer over plain FTP is stable.
+          protocol: ftp
           # The published app lives at the FTP root on SmarterASP (root already holds
           # the server DLLs + its own wwwroot subfolder), so deploy to ./ not /wwwroot/.
           server-dir: ./
