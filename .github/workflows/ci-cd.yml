@@ -52,10 +52,15 @@ jobs:
           server:   ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          # SmarterASP web root. Adjust if your FTP user already lands in the site root.
-          server-dir: /wwwroot/
+          # SmarterASP requires explicit FTP over TLS (matches FileZilla's setting).
+          protocol: ftps
+          # The published app lives at the FTP root on SmarterASP (root already holds
+          # the server DLLs + its own wwwroot subfolder), so deploy to ./ not /wwwroot/.
+          server-dir: ./
           local-dir: ./publish/
-          # Only changed files are uploaded (diff sync). State file lives on the server.
+          # Only changed files are uploaded (diff sync). Excluded paths are never
+          # uploaded AND never deleted on the server, so the host keeps its own
+          # config and runtime data (DataProtection keys, uploaded images).
           exclude: |
             **/.git*
             **/.git*/**
@@ -63,3 +68,5 @@ jobs:
             appsettings.json
             appsettings.Development.json
             appsettings.Production.json
+            App_Data/**
+            wwwroot/uploads/**
