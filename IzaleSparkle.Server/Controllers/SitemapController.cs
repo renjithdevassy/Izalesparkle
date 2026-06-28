@@ -18,6 +18,7 @@ public class SitemapController : ControllerBase
     }
 
     [HttpGet("sitemap.xml")]
+    [HttpHead("sitemap.xml")]
     [Produces("application/xml")]
     public async Task<IActionResult> Sitemap()
     {
