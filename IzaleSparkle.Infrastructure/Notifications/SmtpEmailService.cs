@@ -20,7 +20,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
         byte[]? pdfBytes = null;
         try
         {
-            pdfBytes = InvoiceGenerator.Generate(data);
+            pdfBytes = InvoiceGenerator.Generate(data, GetBankDetails());
             log.LogInformation("[Invoice] PDF generated for {OrderNumber} ({Size} bytes)",
                 data.OrderNumber, pdfBytes.Length);
         }
@@ -229,7 +229,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
 
         // Attach the same PDF invoice the customer receives so admins can print/pack.
         byte[]? pdfBytes = null;
-        try { pdfBytes = InvoiceGenerator.Generate(data); }
+        try { pdfBytes = InvoiceGenerator.Generate(data, GetBankDetails()); }
         catch (Exception ex) { log.LogError(ex, "[Invoice] PDF generation failed for admin notification {OrderNumber}", data.OrderNumber); }
         var invoiceFilename = $"Izale-Sparkle-Invoice-{data.OrderNumber}.pdf";
 
@@ -371,9 +371,20 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
     // ── GENERATE PDF (for admin download) ────────────────────────
     public Task<byte[]> GenerateInvoicePdfAsync(OrderEmailData data, CancellationToken ct = default)
     {
-        var bytes = InvoiceGenerator.Generate(data);
+        var bytes = InvoiceGenerator.Generate(data, GetBankDetails());
         return Task.FromResult(bytes);
     }
+
+    // ── BANK / PAYMENT DETAILS (for invoice) ──────────────────────
+    /// <summary>Reads bank transfer details from the "Payment" config section.</summary>
+    BankDetails GetBankDetails() => new(
+        config["Payment:BankName"],
+        config["Payment:AccountName"],
+        config["Payment:SortCode"],
+        config["Payment:AccountNumber"],
+        config["Payment:Iban"],
+        config["Payment:Reference"],
+        config["Payment:Note"]);
 
     // ── ADMIN RECIPIENTS ──────────────────────────────────────────
     /// <summary>

@@ -9,6 +9,24 @@ namespace IzaleSparkle.Infrastructure.Notifications;
 /// Generates a professional branded PDF invoice using QuestPDF (Community — free).
 /// Returns the PDF as a byte array ready to attach to an email.
 /// </summary>
+/// <summary>Bank/payment details rendered on the invoice, sourced from configuration.</summary>
+public record BankDetails(
+    string? BankName,
+    string? AccountName,
+    string? SortCode,
+    string? AccountNumber,
+    string? Iban,
+    string? Reference,
+    string? Note)
+{
+    public bool HasBank =>
+        !string.IsNullOrWhiteSpace(BankName) ||
+        !string.IsNullOrWhiteSpace(AccountName) ||
+        !string.IsNullOrWhiteSpace(SortCode) ||
+        !string.IsNullOrWhiteSpace(AccountNumber) ||
+        !string.IsNullOrWhiteSpace(Iban);
+}
+
 public static class InvoiceGenerator
 {
     // Brand colours as strings (QuestPDF Background/BorderColor accept hex strings)
@@ -20,7 +38,7 @@ public static class InvoiceGenerator
     private const string BorderGold = "#E8DFC4";
     private const string GreenOk    = "#16a34a";
 
-    public static byte[] Generate(OrderEmailData d)
+    public static byte[] Generate(OrderEmailData d, BankDetails? bank = null)
     {
         QuestPDF.Settings.License = LicenseType.Community;
 
@@ -220,17 +238,49 @@ public static class InvoiceGenerator
                         });
                     });
 
-                    // Payment note
+                    // Payment note + bank transfer details (from configuration)
                     col.Item().PaddingTop(20)
                         .Background(CreamSoft).Border(0.5f).BorderColor(BorderGold)
                         .Padding(12).Column(note =>
                     {
                         note.Item().Text("PAYMENT INFORMATION")
                             .FontSize(8).FontColor(Gold).Bold();
+
+                        var noteText = !string.IsNullOrWhiteSpace(bank?.Note)
+                            ? bank!.Note!
+                            : "Payment for this order will be collected separately. " +
+                              "Please contact us if you have any questions regarding payment or delivery.";
                         note.Item().PaddingTop(4)
-                            .Text("Payment for this order will be collected separately. " +
-                                  "Please contact us if you have any questions regarding payment or delivery.")
-                            .FontSize(9).FontColor(WarmGray).LineHeight(1.6f);
+                            .Text(noteText).FontSize(9).FontColor(WarmGray).LineHeight(1.6f);
+
+                        if (bank is { HasBank: true })
+                        {
+                            note.Item().PaddingTop(8)
+                                .Text("Bank Transfer Details").FontSize(9).FontColor(Charcoal).Bold();
+                            note.Item().PaddingTop(4).Table(t =>
+                            {
+                                t.ColumnsDefinition(c => { c.ConstantColumn(120); c.RelativeColumn(); });
+
+                                void BankRow(string label, string? value)
+                                {
+                                    if (string.IsNullOrWhiteSpace(value)) return;
+                                    t.Cell().PaddingVertical(1).Text(label).FontSize(9).FontColor(WarmGray);
+                                    t.Cell().PaddingVertical(1).Text(value).FontSize(9).FontColor(Charcoal);
+                                }
+
+                                BankRow("Bank:", bank.BankName);
+                                BankRow("Account Name:", bank.AccountName);
+                                BankRow("Sort Code:", bank.SortCode);
+                                BankRow("Account Number:", bank.AccountNumber);
+                                BankRow("IBAN:", bank.Iban);
+                                // Always show the order number as the payment reference.
+                                BankRow("Reference:", d.OrderNumber);
+                            });
+
+                            if (!string.IsNullOrWhiteSpace(bank.Reference))
+                                note.Item().PaddingTop(4)
+                                    .Text(bank.Reference).FontSize(8).FontColor(WarmGray).Italic();
+                        }
                     });
 
                     col.Item().PaddingTop(16).AlignCenter()
