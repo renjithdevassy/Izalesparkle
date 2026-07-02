@@ -43,6 +43,16 @@ jobs:
           retention-days: 14
 
       # ── DEPLOY (push to main only) ────────────────────────────────
+      # Take the app offline first: dropping app_offline.htm makes IIS stop the
+      # ASP.NET Core app and release its lock on the _framework files, so the
+      # upload can overwrite them (otherwise: 550 "file in use by another process").
+      - name: Take app offline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl -sS --connect-timeout 30 -T app_offline.htm \
+            "ftp://${{ secrets.FTP_SERVER }}/app_offline.htm" \
+            --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}"
+
       # Config files are excluded so the live host keeps its own real
       # appsettings (DB connection, Gmail app password, JWT secret).
       - name: Deploy to SmarterASP.NET via FTP
@@ -71,3 +81,14 @@ jobs:
             appsettings.Production.json
             App_Data/**
             wwwroot/uploads/**
+            app_offline.htm
+
+      # Bring the app back online by removing app_offline.htm — runs even if the
+      # deploy failed, so the site never gets stuck on the offline page.
+      - name: Bring app online
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl -sS --connect-timeout 30 -o /dev/null \
+            "ftp://${{ secrets.FTP_SERVER }}/" \
+            --user "${{ secrets.FTP_USERNAME }}:${{ secrets.FTP_PASSWORD }}" \
+            -Q "DELE app_offline.htm" || true
