@@ -45,7 +45,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
     static string BuildOrderConfirmationHtml(OrderEmailData data)
     {
         var itemRows = string.Join("", data.Items.Select(i =>
-            $"<tr><td style='padding:8px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'>{System.Net.WebUtility.HtmlEncode(i.Name)}<br/><small style='color:#7A6E5F'>{System.Net.WebUtility.HtmlEncode(i.Material)} · Qty {i.Qty}</small></td>" +
+            $"<tr><td style='padding:8px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'>{System.Net.WebUtility.HtmlEncode(i.Name)}<br/><small style='color:#7A6E5F'>{(string.IsNullOrWhiteSpace(i.Material) ? "" : System.Net.WebUtility.HtmlEncode(i.Material) + " · ")}Qty {i.Qty}</small></td>" +
             $"<td style='padding:8px 0;border-bottom:1px solid #f0ead8;text-align:right;color:#C8973A'>£{i.LineTotal:N2}</td></tr>"));
 
         var discountRow = data.Discount > 0
@@ -100,7 +100,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
     static string BuildAdminOrderHtml(OrderEmailData data)
     {
         var itemRows = string.Join("", data.Items.Select(i =>
-            $"<tr><td style='padding:6px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'><strong>{System.Net.WebUtility.HtmlEncode(i.Name)}</strong><br/><small style='color:#7A6E5F'>{System.Net.WebUtility.HtmlEncode(i.Material)} · Qty {i.Qty}</small></td>" +
+            $"<tr><td style='padding:6px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'><strong>{System.Net.WebUtility.HtmlEncode(i.Name)}</strong><br/><small style='color:#7A6E5F'>{(string.IsNullOrWhiteSpace(i.Material) ? "" : System.Net.WebUtility.HtmlEncode(i.Material) + " · ")}Qty {i.Qty}</small></td>" +
             $"<td style='padding:6px 0;border-bottom:1px solid #f0ead8;text-align:right;color:#C8973A;font-family:Georgia,serif'>£{i.LineTotal:N2}</td></tr>"));
 
         var discountRow = data.Discount > 0
@@ -236,7 +236,7 @@ public class SmtpEmailService(IConfiguration config, ILogger<SmtpEmailService> l
         var subject = $"🔔 New Order — {data.OrderNumber} | £{data.Total:N2}";
 
         var itemRows = string.Join("", data.Items.Select(i =>
-            $"<tr><td style='padding:6px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'><strong>{System.Net.WebUtility.HtmlEncode(i.Name)}</strong><br/><small style='color:#7A6E5F'>{System.Net.WebUtility.HtmlEncode(i.Material)} · Qty {i.Qty}</small></td>" +
+            $"<tr><td style='padding:6px 0;border-bottom:1px solid #f0ead8;color:#1C1A16'><strong>{System.Net.WebUtility.HtmlEncode(i.Name)}</strong><br/><small style='color:#7A6E5F'>{(string.IsNullOrWhiteSpace(i.Material) ? "" : System.Net.WebUtility.HtmlEncode(i.Material) + " · ")}Qty {i.Qty}</small></td>" +
             $"<td style='padding:6px 0;border-bottom:1px solid #f0ead8;text-align:right;color:#C8973A;font-family:Georgia,serif'>£{i.LineTotal:N2}</td></tr>"));
 
         var discountRow = data.Discount > 0

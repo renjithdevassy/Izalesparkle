@@ -161,7 +161,8 @@ public static class InvoiceGenerator
                             table.Cell().Element(DCell).Column(desc =>
                             {
                                 desc.Item().Text(item.Name).Bold();
-                                desc.Item().Text(item.Material).FontColor(WarmGray).FontSize(8.5f);
+                                if (!string.IsNullOrWhiteSpace(item.Material))
+                                    desc.Item().Text(item.Material).FontColor(WarmGray).FontSize(8.5f);
                             });
 
                             table.Cell().Element(DCell).Text($"{item.Qty}").AlignCenter();

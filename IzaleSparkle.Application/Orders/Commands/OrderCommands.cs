@@ -116,7 +116,8 @@ public sealed class PlaceOrderCommandHandler(
             ShippingTier:    req.ShippingTier,
             Items: orderItems.Select(x => new OrderEmailItem(
                 x.product.Name,
-                FormatMetalType(x.metal.ToString()),
+                // Metal/material is not shown on invoices or emails (we don't sell by metal).
+                "",
                 x.qty,
                 x.product.Price.Amount,
                 x.product.Price.Amount * x.qty)).ToList()

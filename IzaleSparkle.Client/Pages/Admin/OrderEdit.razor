@@ -60,7 +60,6 @@ else
                             <img src="@item.ImageUrl" alt="@item.ProductName" class="order-item-img" />
                             <div class="order-item-info">
                                 <div class="order-item-name">@item.ProductName</div>
-                                <div class="order-item-meta">@item.Metal</div>
                             </div>
                             <div style="display:flex;align-items:center;gap:.4rem;flex-shrink:0">
                                 <button class="qty-btn" @onclick="() => ChangeQty(item, -1)"
@@ -372,15 +371,6 @@ else
                 <div class="admin-field">
                     <label>Quantity</label>
                     <input type="number" @bind="AddQty" min="1" step="1" />
-                </div>
-                <div class="admin-field">
-                    <label>Metal</label>
-                    <select @bind="AddMetal" class="admin-select">
-                        <option value="YellowGold18K">18K Yellow Gold</option>
-                        <option value="WhiteGold18K">18K White Gold</option>
-                        <option value="RoseGold18K">18K Rose Gold</option>
-                        <option value="Platinum">Platinum</option>
-                    </select>
                 </div>
             </div>
 
