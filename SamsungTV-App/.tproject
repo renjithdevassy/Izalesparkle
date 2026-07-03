@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<tizen:project xmlns:tizen="http://www.tizen.org/ns/ide" name="IzaleSparkleTV">
+    <tizen:type>TVWeb</tizen:type>
+</tizen:project>

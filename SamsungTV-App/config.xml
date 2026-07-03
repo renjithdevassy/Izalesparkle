@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://izalesparkle.com/tv"
+        version="1.0.0"
+        viewmodes="fullscreen">
+
+    <tizen:application id="IzaleSprkl.tv" package="IzaleSprkl" required_version="2.4"/>
+
+    <content src="index.html"/>
+
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+
+    <tizen:profile name="tv"/>
+
+    <name>Izale Sparkle</name>
+
+    <icon src="icon.png"/>
+
+    <tizen:setting screen-orientation="landscape"
+                   context-menu="disable"
+                   background-support="enable"
+                   encryption="disable"
+                   install-location="auto"
+                   hwkey-event="enable"/>
+</widget>

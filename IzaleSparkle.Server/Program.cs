@@ -69,6 +69,9 @@ builder.Services.AddAuthorization(o =>
     o.AddPolicy("AuthUsers", p => p.RequireAuthenticatedUser());
 });
 
+builder.Services.AddCors(o => o.AddPolicy("TvApp", p =>
+    p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+
 builder.Services.AddResponseCompression();
 builder.Services.AddResponseCaching();
 builder.Services.AddRateLimiter(opt =>
@@ -117,6 +120,7 @@ app.UseBlazorFrameworkFiles();
 // Serves all wwwroot static files including /uploads/* since uploads folder is inside wwwroot
 app.UseStaticFiles();
 app.UseRouting();
+app.UseCors("TvApp");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
