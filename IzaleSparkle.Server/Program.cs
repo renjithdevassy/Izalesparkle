@@ -111,6 +111,7 @@ if (app.Environment.IsDevelopment())
 }
 else { app.UseHsts(); }
 
+app.UseCors("TvApp");
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseHttpsRedirection();
 app.UseResponseCompression();
@@ -120,7 +121,6 @@ app.UseBlazorFrameworkFiles();
 // Serves all wwwroot static files including /uploads/* since uploads folder is inside wwwroot
 app.UseStaticFiles();
 app.UseRouting();
-app.UseCors("TvApp");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
