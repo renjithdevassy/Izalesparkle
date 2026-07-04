@@ -97,6 +97,22 @@
     }
     .item-name { color: var(--text); }
     .item-price { color: var(--gold); font-weight: 600; }
+    .item-left { display: flex; align-items: center; gap: 20px; }
+    .item-thumb {
+        width: 90px; height: 90px; object-fit: cover; border-radius: 10px;
+        border: 1px solid var(--border); background: var(--dark3); flex-shrink: 0;
+    }
+    .row-thumbs { display: flex; align-items: center; }
+    .row-thumb {
+        width: 64px; height: 64px; object-fit: cover; border-radius: 8px;
+        border: 2px solid var(--dark2); background: var(--dark3);
+        margin-right: -16px;
+    }
+    .row-thumb-more {
+        width: 64px; height: 64px; border-radius: 8px; background: var(--dark3);
+        border: 2px solid var(--dark2); color: var(--text-muted); font-size: 20px;
+        display: flex; align-items: center; justify-content: center;
+    }
     #notification {
         position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
         background: linear-gradient(135deg, #1A2A1A, #0D1F0D);
@@ -119,7 +135,7 @@
 <!-- LOGIN / STATUS SCREEN -->
 <div id="login-screen" class="screen active">
     <div class="login-logo">IZALE <span>SPARKLE</span></div>
-    <div class="login-subtitle">Admin Dashboard v3.0</div>
+    <div class="login-subtitle">Admin Dashboard v3.1</div>
     <div class="login-box">
         <div class="login-error" id="login-error">Starting...</div>
     </div>
@@ -347,12 +363,27 @@ function renderOrdersTable() {
     var rows = '';
     for (var i = 0; i < orders.length; i++) {
         var o = orders[i];
-        rows += '<tr data-index="' + i + '" class="order-row"><td>' + o.orderNumber + '</td><td>' + o.customerEmail + '</td><td>' + fmt(o.total) + '</td><td>' + badge(o.status) + '</td><td>' + (o.paymentMethod || 'Bank Transfer') + '</td><td>' + fmtDate(o.createdAt) + '</td></tr>';
+        rows += '<tr data-index="' + i + '" class="order-row"><td>' + orderThumbs(o) + '</td><td>' + o.orderNumber + '</td><td>' + o.customerEmail + '</td><td>' + fmt(o.total) + '</td><td>' + badge(o.status) + '</td><td>' + (o.paymentMethod || 'Bank Transfer') + '</td><td>' + fmtDate(o.createdAt) + '</td></tr>';
     }
     $('orders-list-wrap').innerHTML =
-        '<table class="orders-table"><thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Payment</th><th>Date</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        '<table class="orders-table"><thead><tr><th>Items</th><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Payment</th><th>Date</th></tr></thead><tbody>' + rows + '</tbody></table>';
     orderFocusIndex = 0;
     updateOrderFocus();
+}
+
+// Up to 3 overlapping product thumbnails for an order row, "+N" if more.
+function thumbImg(url, cls) {
+    return '<img class="' + cls + '" src="' + url + '" onerror="this.style.display=\'none\'">';
+}
+function orderThumbs(o) {
+    var items = o.items || [];
+    var html = '<div class="row-thumbs">';
+    var shown = 0;
+    for (var i = 0; i < items.length && shown < 3; i++) {
+        if (items[i].imageUrl) { html += thumbImg(items[i].imageUrl, 'row-thumb'); shown++; }
+    }
+    if (items.length > shown) html += '<div class="row-thumb-more">+' + (items.length - shown) + '</div>';
+    return html + '</div>';
 }
 
 // ── ORDER DETAIL ─────────────────────────────────────────────────
@@ -366,7 +397,10 @@ function openOrderDetail(index) {
     var list = o.items || [];
     for (var i = 0; i < list.length; i++) {
         var it = list[i];
-        items += '<div class="item-row"><div class="item-name">' + it.productName + ' × ' + it.quantity + (it.size ? ' — ' + it.size : '') + '</div><div class="item-price">' + fmt(it.lineTotal) + '</div></div>';
+        items += '<div class="item-row"><div class="item-left">' +
+            (it.imageUrl ? thumbImg(it.imageUrl, 'item-thumb') : '') +
+            '<div class="item-name">' + it.productName + ' × ' + it.quantity + (it.size ? ' — ' + it.size : '') + '</div></div>' +
+            '<div class="item-price">' + fmt(it.lineTotal) + '</div></div>';
     }
     $('detail-grid').innerHTML =
         '<div class="detail-section"><h3>Customer &amp; Shipping</h3>' +
