@@ -69,7 +69,19 @@
         border-bottom: 1px solid var(--border);
     }
     .orders-table td { padding: 18px 20px; font-size: 24px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-    .orders-table tr.focused td, .orders-table tr:focus td { background: rgba(201,168,76,0.08); }
+    .orders-table tr.focused td, .orders-table tr:focus td {
+        background: rgba(201,168,76,0.22);
+        color: #FFF;
+    }
+    .orders-table tr.focused td:first-child {
+        border-left: 8px solid var(--gold);
+        padding-left: 12px;
+    }
+    .orders-table tr.focused td {
+        border-top: 2px solid var(--gold);
+        border-bottom: 2px solid var(--gold);
+    }
+    .orders-table tr.focused td:last-child { border-right: 8px solid var(--gold); }
     .badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 20px; font-weight: 600; }
     .badge-pending    { background: rgba(243,156,18,0.2);  color: var(--orange); }
     .badge-processing { background: rgba(52,152,219,0.2);  color: var(--blue); }
@@ -135,7 +147,7 @@
 <!-- LOGIN / STATUS SCREEN -->
 <div id="login-screen" class="screen active">
     <div class="login-logo">IZALE <span>SPARKLE</span></div>
-    <div class="login-subtitle">Admin Dashboard v3.1</div>
+    <div class="login-subtitle">Admin Dashboard v3.2</div>
     <div class="login-box">
         <div class="login-error" id="login-error">Starting...</div>
     </div>
