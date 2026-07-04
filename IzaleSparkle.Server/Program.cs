@@ -54,13 +54,28 @@ var jwtIssuer   = builder.Configuration["Jwt:Issuer"]   ?? "IzaleSparkle";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "IzaleSparkleUsers";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
+    .AddJwtBearer(o =>
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-        ValidateIssuer   = true, ValidIssuer   = jwtIssuer,
-        ValidateAudience = true, ValidAudience = jwtAudience,
-        ValidateLifetime = true, ClockSkew     = TimeSpan.Zero,
+        o.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidateIssuer   = true, ValidIssuer   = jwtIssuer,
+            ValidateAudience = true, ValidAudience = jwtAudience,
+            ValidateLifetime = true, ClockSkew     = TimeSpan.Zero,
+        };
+        // TV app (old Tizen browser) can't send Authorization headers without a
+        // CORS preflight it fails on — accept the token as a query parameter too.
+        o.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (string.IsNullOrEmpty(ctx.Token) &&
+                    ctx.Request.Query.TryGetValue("access_token", out var t))
+                    ctx.Token = t;
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization(o =>

@@ -29,6 +29,21 @@ public class AuthController(IMediator mediator) : ControllerBase
         return result.Success ? Ok(result) : Unauthorized(result);
     }
 
+    /// <summary>Login for TV app: accepts JSON as raw text/plain to avoid CORS preflight on old Tizen browsers.</summary>
+    [HttpPost("tv-login")]
+    [Consumes("text/plain", "application/json")]
+    [ProducesResponseType(typeof(AuthResponse), 200)]
+    public async Task<IActionResult> TvLogin(CancellationToken ct)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var body = await reader.ReadToEndAsync(ct);
+        var req = System.Text.Json.JsonSerializer.Deserialize<LoginRequest>(body,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (req is null) return BadRequest();
+        var result = await mediator.Send(new LoginCommand(req), ct);
+        return result.Success ? Ok(result) : Unauthorized(result);
+    }
+
     /// <summary>Request a password reset link by email. Always returns 200 (never reveals account existence).</summary>
     [HttpPost("forgot-password")]
     [ProducesResponseType(typeof(AuthMessageResponse), 200)]

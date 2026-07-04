@@ -11,7 +11,7 @@
 <!-- ── LOGIN SCREEN ──────────────────────────── -->
 <div id="login-screen" class="screen active">
     <div class="login-logo">IZALE <span>SPARKLE</span></div>
-    <div class="login-subtitle">Admin Dashboard</div>
+    <div class="login-subtitle">Admin Dashboard <span style="color:#C9A84C">v2.1</span></div>
     <div class="login-box">
         <div class="login-field">
             <label>Email</label>
@@ -21,7 +21,7 @@
             <label>Password</label>
             <input type="password" id="login-password" value="Renjithanoopy1!">
         </div>
-        <button class="btn-login" id="login-btn">Sign In</button>
+        <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
         <div class="login-error" id="login-error"></div>
     </div>
 </div>
@@ -113,6 +113,19 @@
     </div>
 </div>
 
+<div id="debug-box" style="position:fixed;bottom:10px;left:10px;right:10px;color:#FFD700;font-size:26px;font-family:monospace;z-index:9999;background:rgba(0,0,0,0.7);padding:10px;white-space:pre-wrap;"></div>
+<script>
+window.dbg = function(m) {
+    var b = document.getElementById('debug-box');
+    b.textContent += m + '\n';
+};
+window.onerror = function(msg, src, line) {
+    dbg('JS ERROR: ' + msg + ' @ line ' + line);
+    return false;
+};
+dbg('HTML loaded');
+</script>
 <script src="js/app.js"></script>
+<script>dbg('app.js parsed OK, doLogin=' + typeof doLogin);</script>
 </body>
 </html>

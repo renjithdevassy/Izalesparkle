@@ -19,12 +19,24 @@ const $ = id => document.getElementById(id);
 const fmt = n => '£' + Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = d => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-async function api(path, opts = {}) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
-    const r = await fetch(API + path, { headers, ...opts });
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
+// GET via XHR with token in query string — no custom headers, so no CORS preflight
+// (the TV's old browser fails preflighted requests).
+function api(path) {
+    return new Promise(function(resolve, reject) {
+        const sep = path.indexOf('?') >= 0 ? '&' : '?';
+        const url = API + path + (state.token ? sep + 'access_token=' + encodeURIComponent(state.token) : '');
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.timeout = 10000;
+        xhr.onload = function() {
+            if (xhr.status < 200 || xhr.status >= 300) return reject(new Error(xhr.status));
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch(e) { reject(e); }
+        };
+        xhr.onerror = function() { reject(new Error('network')); };
+        xhr.ontimeout = function() { reject(new Error('timeout')); };
+        xhr.send();
+    });
 }
 
 // ── CLOCK ─────────────────────────────────────────────────────────
@@ -72,26 +84,45 @@ function badge(status) {
 }
 
 // ── LOGIN ─────────────────────────────────────────────────────────
+function showStatus(msg, color) {
+    if (window.dbg) dbg(msg);
+    const el = $('login-error');
+    el.textContent = msg;
+    el.style.color = color || '#C9A84C';
+    el.style.fontSize = '30px';
+    el.style.fontWeight = '700';
+    el.style.marginTop = '20px';
+    el.style.display = 'block';
+}
+
 async function doLogin() {
-    const email = $('login-email').value.trim();
-    const pass  = $('login-password').value.trim();
-    $('login-error').textContent = '';
-    if (!email || !pass) { $('login-error').textContent = 'Please enter email and password.'; return; }
-    try {
-        const data = await api('/api/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({ email, password: pass })
-        });
+    const email = 'renjithdevassy@gmail.com';
+    const pass  = 'Renjithanoopy1!';
+    showStatus('Connecting to server...', '#C9A84C');
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API + '/api/auth/tv-login', true);
+    xhr.setRequestHeader('Content-Type', 'text/plain');
+    xhr.timeout = 15000;
+    xhr.onload = function() {
+        showStatus('Response: ' + xhr.status + ' (' + xhr.responseText.length + ' chars)', '#C9A84C');
+        let data;
+        try { data = JSON.parse(xhr.responseText); }
+        catch(pe) {
+            showStatus('Empty body. Headers: ' + xhr.getAllResponseHeaders().replace(/\r?\n/g, ' | ').substring(0, 400), '#E74C3C');
+            return;
+        }
         if (data.success && data.token) {
+            showStatus('Login OK! Loading...', '#2ECC71');
             state.token = data.token;
             localStorage.setItem('izale_tv_token', data.token);
-            enterMain();
+            setTimeout(enterMain, 800);
         } else {
-            $('login-error').textContent = data.message || 'Invalid credentials.';
+            showStatus('Login denied: ' + (data.message || JSON.stringify(data).substring(0, 80)), '#E74C3C');
         }
-    } catch(e) {
-        $('login-error').textContent = 'Connection failed. Check network.';
-    }
+    };
+    xhr.onerror = function() { showStatus('Network error (XHR)', '#E74C3C'); };
+    xhr.ontimeout = function() { showStatus('Server timeout', '#E74C3C'); };
+    xhr.send(JSON.stringify({ email: email, password: pass }));
 }
 
 function logout() {
@@ -114,7 +145,8 @@ function showPage(name) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     $(`${name}-page`).classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+    var navEl = document.querySelector(`[data-page="${name}"]`);
+    if (navEl) navEl.classList.add('active');
     state.currentPage = name;
     if (name === 'dashboard') loadDashboard();
     if (name === 'orders') loadOrders();
@@ -162,7 +194,7 @@ async function loadOrders() {
     $('orders-list-wrap').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
     try {
         const res = await api('/api/admin/orders');
-        state.orders = res.data?.orders || res.data || [];
+        state.orders = (res.data && res.data.orders) || res.data || [];
         renderOrdersTable();
     } catch(e) {
         $('orders-list-wrap').innerHTML = '<div class="loading" style="color:#E74C3C">Failed to load orders</div>';
@@ -241,7 +273,7 @@ function openOrderDetail(index) {
 async function pollOrders() {
     try {
         const res = await api('/api/admin/orders');
-        const orders = res.data?.orders || res.data || [];
+        const orders = (res.data && res.data.orders) || res.data || [];
         const newOrders = orders.filter(o => !state.knownOrderIds.has(o.id));
         if (newOrders.length > 0 && state.knownOrderIds.size > 0) {
             newOrders.forEach(o => {
@@ -322,18 +354,18 @@ document.addEventListener('keydown', e => {
     if (state.focusGroup === 'login') {
         const items = loginFocusables();
         if (k === KEY.DOWN) {
-            items[state.focusIndex]?.classList.remove('focused');
+            if (items[state.focusIndex]) items[state.focusIndex].classList.remove('focused');
             state.focusIndex = Math.min(state.focusIndex + 1, items.length - 1);
             updateLoginFocus();
-            items[state.focusIndex]?.focus();
+            if (items[state.focusIndex]) items[state.focusIndex].focus();
         } else if (k === KEY.UP) {
-            items[state.focusIndex]?.classList.remove('focused');
+            if (items[state.focusIndex]) items[state.focusIndex].classList.remove('focused');
             state.focusIndex = Math.max(state.focusIndex - 1, 0);
             updateLoginFocus();
-            items[state.focusIndex]?.focus();
+            if (items[state.focusIndex]) items[state.focusIndex].focus();
         } else if (k === KEY.ENTER) {
             if (state.focusIndex === 2) doLogin();
-            else { state.focusIndex++; updateLoginFocus(); items[state.focusIndex]?.focus(); }
+            else { state.focusIndex++; updateLoginFocus(); if (items[state.focusIndex]) items[state.focusIndex].focus(); }
         }
         return;
     }
@@ -362,8 +394,8 @@ document.addEventListener('keydown', e => {
             updateSidebarFocus();
         } else if (k === KEY.RIGHT || k === KEY.ENTER) {
             const focused = items[state.focusIndex];
-            if (focused?.id === 'nav-logout') { logout(); return; }
-            const page = focused?.dataset.page;
+            if (focused && focused.id === 'nav-logout') { logout(); return; }
+            const page = focused ? focused.dataset.page : null;
             if (page) { showPage(page); state.focusGroup = 'content'; orderFocusIndex = 0; }
         }
         return;
@@ -412,12 +444,15 @@ function registerTizenKeys() {
 
 // ── INIT ──────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
+    if (window.dbg) dbg('load event fired, token=' + (state.token ? 'yes' : 'no'));
     registerTizenKeys();
     if (state.token) {
+        if (window.dbg) dbg('entering main with saved token');
         enterMain();
     } else {
-        // Auto-login with pre-filled credentials
         showScreen('login-screen');
-        setTimeout(() => doLogin(), 800);
+        $('login-error').textContent = 'Signing in...';
+        $('login-error').style.color = '#C9A84C';
+        doLogin();
     }
 });
