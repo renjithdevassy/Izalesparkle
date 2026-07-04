@@ -9,6 +9,8 @@
 
     <content src="index.html"/>
 
+    <access origin="https://izalesparkle.com" subdomains="true"/>
+
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
 
