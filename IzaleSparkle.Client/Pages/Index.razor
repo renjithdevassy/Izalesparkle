@@ -1,7 +1,6 @@
 @page "/"
 @inject IApiClient Api
 @inject ProductService FallbackSvc
-@inject IJSRuntime JS
 
 <PageTitle>Izale Sparkle — Where Every Look Sparkles | Fine Jewellery UK</PageTitle>
 
@@ -13,24 +12,6 @@
     <h1 class="page-hero-title">Where Every Look <em>Sparkles</em></h1>
     <p class="page-hero-sub">Imitation jewellery inspired by Indian artistry — because every outfit deserves to shine.</p>
 </section>
-
-<!-- ══ PROMO / DISCOUNT ADVERTISEMENT ══ -->
-<div class="promo-banner reveal">
-    <div class="promo-inner">
-        <div class="promo-text">
-            <span class="promo-eyebrow">✦ Limited Time Offer ✦</span>
-            <h2 class="promo-title">Get <em>10% Off</em> Your Order</h2>
-            <p class="promo-sub">Apply the code at checkout and let every look sparkle for less.</p>
-        </div>
-        <div class="promo-action">
-            <button class="promo-code" @onclick="CopyPromo" title="Click to copy code">
-                <span class="promo-code-label">@(PromoCopied ? "✓ Copied!" : "Tap to copy")</span>
-                <span class="promo-code-value">SPARKLE10</span>
-            </button>
-            <a href="/shop" class="btn btn-gold">Shop Now</a>
-        </div>
-    </div>
-</div>
 
 <!-- ══ MARQUEE ══ -->
 <div class="marquee-bar" aria-hidden="true">
@@ -147,19 +128,9 @@
 
 @code {
     bool Loading = true;
-    bool PromoCopied = false;
     List<ProductSummaryResponse> Featured = new();
     string EmailInput = "";
     string SubscribeMsg = "";
-
-    async Task CopyPromo()
-    {
-        try { await JS.InvokeAsync<bool>("copyToClipboard", "SPARKLE10"); } catch { }
-        PromoCopied = true;
-        StateHasChanged();
-        await Task.Delay(2000);
-        PromoCopied = false;
-    }
 
     record TestiItem(string Text, string Author);
 
