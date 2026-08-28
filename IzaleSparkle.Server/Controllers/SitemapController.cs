@@ -28,9 +28,8 @@ public class SitemapController : ControllerBase
             new() { Loc = BaseUrl + "/shop", Changefreq = "daily", Priority = "0.9", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
             new() { Loc = BaseUrl + "/contact", Changefreq = "monthly", Priority = "0.6", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
             new() { Loc = BaseUrl + "/terms", Changefreq = "monthly", Priority = "0.4", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
-            new() { Loc = BaseUrl + "/wishlist", Changefreq = "weekly", Priority = "0.5", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
-            new() { Loc = BaseUrl + "/login", Changefreq = "monthly", Priority = "0.4", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
-            new() { Loc = BaseUrl + "/register", Changefreq = "monthly", Priority = "0.4", Lastmod = DateTime.UtcNow.ToString("yyyy-MM-dd") },
+            // /wishlist, /login and /register are account-state pages with no unique
+            // indexable content for search engines — deliberately excluded from the sitemap.
         };
 
         try
