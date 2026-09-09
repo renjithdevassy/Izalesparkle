@@ -100,17 +100,17 @@ else
 
             <!-- THUMBNAILS -->
             <div class="thumb-strip">
-                @for (int i = 0; i < Product.Images.Count; i++)
+                @for (int i = 0; i < Gallery.Count; i++)
                 {
                     var idx = i;
                     <div class="thumb @(CurrentIndex == idx ? "active" : "")"
                          @onclick="() => SetImage(idx)">
-                        <img src="@Product.Images[idx]" alt="View @(idx+1)" loading="lazy" />
+                        <img src="@Gallery[idx]" alt="View @(idx+1)" loading="lazy" />
                     </div>
                 }
             </div>
             <div class="img-counter">
-                Image <span>@(CurrentIndex+1)</span> of <span>@Product.Images.Count</span>
+                Image <span>@(CurrentIndex+1)</span> of <span>@Gallery.Count</span>
             </div>
         </div>
 
@@ -281,19 +281,19 @@ else
     {
         <div class="lightbox open">
             <button class="lb-close" @onclick="() => LightboxOpen = false">✕</button>
-            <button class="lb-nav lb-prev" @onclick="() => LbIdx = (LbIdx - 1 + Product.Images.Count) % Product.Images.Count">‹</button>
-            <button class="lb-nav lb-next" @onclick="() => LbIdx = (LbIdx + 1) % Product.Images.Count">›</button>
-            <img class="lb-img" src="@Product.Images[LbIdx]" alt="@Product.Name" />
+            <button class="lb-nav lb-prev" @onclick="() => LbIdx = (LbIdx - 1 + Gallery.Count) % Gallery.Count">‹</button>
+            <button class="lb-nav lb-next" @onclick="() => LbIdx = (LbIdx + 1) % Gallery.Count">›</button>
+            <img class="lb-img" src="@Gallery[LbIdx]" alt="@Product.Name" />
             <div class="lb-thumbs">
-                @for (int i = 0; i < Product.Images.Count; i++)
+                @for (int i = 0; i < Gallery.Count; i++)
                 {
                     var idx = i;
                     <img class="lb-thumb @(LbIdx == idx ? "active" : "")"
-                         src="@Product.Images[idx]"
+                         src="@Gallery[idx]"
                          @onclick="() => LbIdx = idx" />
                 }
             </div>
-            <div class="lb-counter">@(LbIdx+1) / @Product.Images.Count</div>
+            <div class="lb-counter">@(LbIdx+1) / @Gallery.Count</div>
         </div>
     }
 
@@ -314,6 +314,7 @@ else
     [Parameter] public int Id { get; set; }
 
     Product? Product;
+    List<string> Gallery => Product?.Images ?? new();
     List<Product> Related = new();
     List<Review> Reviews = new();
     List<CategoryResponse> Categories = new();

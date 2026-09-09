@@ -227,7 +227,7 @@ else
                             @(DiscountValid ? "✓" : "✗") @DiscountMsg
                         </div>
                     }
-                    @if (Order.Discount > 0 || !string.IsNullOrEmpty(Order.PromoCode))
+                    @if (Order!.Discount > 0 || !string.IsNullOrEmpty(Order.PromoCode))
                     {
                         <div style="font-size:.65rem;color:var(--warm-gray);margin-top:.3rem">
                             Current: @(Order.PromoCode ?? "—") · −£@Order.Discount.ToString("N2")
@@ -283,7 +283,7 @@ else
             </div>
 
             <!-- Cancel Order -->
-            @if (Order.Status != "Cancelled" && Order.Status != "Delivered" && Order.Status != "Refunded")
+            @if (Order!.Status != "Cancelled" && Order.Status != "Delivered" && Order.Status != "Refunded")
             {
                 <div class="admin-form-card" style="border-color:rgba(220,38,38,.2)">
                     <div class="admin-form-section-title" style="color:#dc2626">Cancel Order</div>
