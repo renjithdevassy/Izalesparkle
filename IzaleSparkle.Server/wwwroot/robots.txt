@@ -12,14 +12,15 @@ Sitemap: https://izalesparkle.com/sitemap.xml
 
 # Block admin and internal paths
 Disallow: /admin/
-Disallow: /api/
+Disallow: /api/admin/
 Disallow: /identity/
-Disallow: /*.json$
-Disallow: /service-worker.js$
-Disallow: /manifest.webmanifest$
 
-# Allow search engines to see the structured data
-Allow: /
+# The storefront is a WebAssembly app: Googlebot must be able to fetch the
+# framework boot manifest (/_framework/blazor.boot.json) and the product API,
+# or the render pass fails and the page shows only an error notice.
+Allow: /_framework/
+Allow: /api/products
+Allow: /api/categories
 
 # Special instructions for major search engines
 User-agent: Googlebot
