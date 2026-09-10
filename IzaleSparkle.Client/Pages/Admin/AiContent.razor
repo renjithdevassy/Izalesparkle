@@ -1,0 +1,348 @@
+@page "/admin/ai-content"
+@layout AdminLayout
+@inject IApiClient Api
+@inject IJSRuntime JS
+
+<div class="admin-page-header">
+    <h1 class="admin-page-title">AI Copywriter</h1>
+    <a href="/admin/products" class="btn btn-outline" style="font-size:.68rem">← Back to Products</a>
+</div>
+
+@if (Configured == false)
+{
+    <div class="admin-form-card">
+        <div class="admin-form-section-title">Not set up yet</div>
+        <p style="font-size:.8rem;line-height:1.6">
+            This page writes product copy from your photos using Google Gemini's free tier —
+            no card, no bill, just per-minute and per-day request caps.
+        </p>
+        <ol style="font-size:.8rem;line-height:1.9;padding-left:1.2rem">
+            <li>Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>.</li>
+            <li>Store it outside source control:
+                <code>dotnet user-secrets set "Gemini:ApiKey" "AIza…"</code>
+                in <strong>IzaleSparkle.Server</strong> (or set it as an app setting on the host).</li>
+            <li>Restart the server and reload this page.</li>
+        </ol>
+        <p style="font-size:.75rem;color:#8a7f76">
+            On the free tier Google may use prompts and responses to improve their products —
+            product photos and marketing copy only, never customer data.
+        </p>
+    </div>
+}
+else
+{
+    <div class="admin-form-grid">
+
+        <!-- ── LEFT: INPUT ── -->
+        <div class="admin-form-card">
+            <div class="admin-form-section-title">The Piece</div>
+
+            <div class="admin-field">
+                <label>Photos * <small>up to 4 · the copy is written from these</small></label>
+                <InputFile OnChange="OnFilesSelected" multiple accept="image/*" class="admin-file-input" />
+                @if (Images.Count > 0)
+                {
+                    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem">
+                        @foreach (var img in Images.ToList())
+                        {
+                            var current = img;
+                            <div style="position:relative;width:66px;height:66px;border-radius:8px;overflow:hidden;border:1px solid #e7ddd2">
+                                <img src="@current.DataUrl" alt="" style="width:100%;height:100%;object-fit:cover" />
+                                <button type="button" title="Remove"
+                                        style="position:absolute;top:2px;right:2px;border:0;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:0 .3rem;cursor:pointer"
+                                        @onclick="() => Images.Remove(current)">✕</button>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(FileError))
+                {
+                    <div class="admin-error-banner" style="margin-top:.6rem">⚠️ @FileError</div>
+                }
+            </div>
+
+            <div class="admin-field">
+                <label>Name / SKU <small>optional — leave blank and it will suggest one</small></label>
+                <input @bind="Name" placeholder="e.g. Palakka Drop Earrings" />
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Category</label>
+                    <select @bind="Category">
+                        <option value="">— Select —</option>
+                        @foreach (var c in Categories)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                </div>
+                <div class="admin-field">
+                    <label>Price (£)</label>
+                    <input type="number" @bind="Price" min="0" step="0.01" placeholder="24.99" />
+                </div>
+            </div>
+
+            <div class="admin-field">
+                <label>Materials / finish</label>
+                <input @bind="Material" placeholder="anti-tarnish, gold-plated brass" />
+            </div>
+            <div class="admin-field">
+                <label>Occasion / collection</label>
+                <input @bind="Occasion" placeholder="Onam, wedding guest, everyday" />
+            </div>
+            <div class="admin-field">
+                <label>Anything else worth saying</label>
+                <textarea @bind="Notes" rows="3"
+                          placeholder="hypoallergenic posts, adjustable 16–18in, limited run of 20…"></textarea>
+            </div>
+
+            <div class="admin-field-row">
+                <div class="admin-field">
+                    <label>Model <small>flash-lite has the largest free allowance</small></label>
+                    <select @bind="SelectedModel">
+                        <option value="">Server default</option>
+                        @foreach (var m in Models)
+                        {
+                            <option value="@m.Id">@m.Id</option>
+                        }
+                    </select>
+                </div>
+                <div class="admin-field">
+                    <label>Creativity <small>0 = literal, 1.4 = playful</small></label>
+                    <input type="number" @bind="Temperature" min="0" max="2" step="0.1" />
+                </div>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%;margin-top:1rem"
+                    disabled="@(Busy || Images.Count == 0)" @onclick="Generate">
+                @(Busy ? "Writing…" : "✨ Generate content")
+            </button>
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="admin-error-banner" style="margin-top:.8rem">⚠️ @Error</div>
+            }
+            @if (Result is not null)
+            {
+                <div class="admin-field-hint" style="margin-top:.8rem">
+                    @Result.ModelUsed · @Result.TokensUsed tokens@(Result.FromCache ? " · served from cache (no request used)" : "")
+                </div>
+            }
+        </div>
+
+        <!-- ── RIGHT: OUTPUT ── -->
+        <div>
+            @if (Busy)
+            {
+                <div class="admin-loading"><div class="loading-spinner">✦</div></div>
+            }
+            else if (Result is null)
+            {
+                <div class="admin-form-card" style="text-align:center;color:#8a7f76;font-size:.8rem;padding:2.5rem 1rem">
+                    Add a photo and press Generate. Nothing is invented — no gemstones,
+                    hallmarks or dimensions the photo doesn't show.
+                </div>
+            }
+            else
+            {
+                <div class="admin-form-card" style="margin-bottom:.9rem;display:flex;gap:.5rem;flex-wrap:wrap">
+                    <button class="btn btn-outline" style="font-size:.68rem" @onclick="CopyAll">Copy everything</button>
+                    <span class="admin-field-hint" style="align-self:center">@CopyNote</span>
+                </div>
+
+                <AiCopyBlock Title="Product title" Body="@Result.ProductTitle" OnCopied="Noted" />
+                <AiCopyBlock Title="@($"SEO meta description ({Result.SeoMetaDescription.Length} chars)")" Body="@Result.SeoMetaDescription" OnCopied="Noted" />
+                <AiCopyBlock Title="Short description" Body="@Result.ShortDescription" OnCopied="Noted" />
+                <AiCopyBlock Title="Long description" Body="@LongWithBullets" OnCopied="Noted" />
+                <AiCopyBlock Title="Material line" Body="@Result.Material" OnCopied="Noted" />
+
+                @foreach (var cap in Result.InstagramCaptions)
+                {
+                    <AiCopyBlock Title="@($"Instagram caption — {cap.Style}")" Body="@cap.Text" OnCopied="Noted" />
+                }
+
+                <AiCopyBlock Title="@($"Hashtags ({Result.Hashtags.Count})")" Body="@HashtagLine" OnCopied="Noted" />
+                <AiCopyBlock Title="Reel — hook and 15s script" Body="@ReelText" OnCopied="Noted" />
+                <AiCopyBlock Title="WhatsApp broadcast" Body="@Result.WhatsAppBroadcast" OnCopied="Noted" />
+                <AiCopyBlock Title="Story poll idea" Body="@Result.StoryPollIdea" OnCopied="Noted" />
+                <AiCopyBlock Title="Care instructions" Body="@Result.CareInstructions" OnCopied="Noted" />
+                <AiCopyBlock Title="Alt text" Body="@Result.AltText" OnCopied="Noted" />
+                <AiCopyBlock Title="What the model saw" Body="@Result.Observed" Copyable="false" />
+            }
+        </div>
+    </div>
+}
+
+@code {
+    // ── STATE ────────────────────────────────────────────────────
+    record PickedImage(string Name, string MimeType, string Base64, string DataUrl);
+
+    bool? Configured;
+    bool Busy;
+    string? Error;
+    string? FileError;
+    string CopyNote = "";
+
+    readonly List<PickedImage> Images = new();
+    List<AiModelInfo> Models = new();
+
+    string Name = "", Category = "", Material = "anti-tarnish, gold-plated brass",
+           Occasion = "", Notes = "", SelectedModel = "";
+    decimal? Price;
+    double Temperature = 0.9;
+
+    GeneratedProductContent? Result;
+
+    static readonly string[] Categories =
+    {
+        "necklaces", "chokers", "earrings", "jhumkas", "bangles", "bracelets",
+        "rings", "anklets", "nose pins", "harams", "sets"
+    };
+
+    const long MaxFileBytes = 4L * 1024 * 1024;
+
+    string LongWithBullets =>
+        Result is null ? "" :
+        Result.LongDescription +
+        (Result.BulletPoints.Count > 0
+            ? "\n\n" + string.Join("\n", Result.BulletPoints.Select(b => "• " + b))
+            : "");
+
+    string HashtagLine => Result is null ? "" : string.Join(" ", Result.Hashtags.Select(h => "#" + h));
+
+    string ReelText => Result is null ? "" : $"HOOK: {Result.ReelHook}\n\n{Result.ReelScript}";
+
+    // ── LIFECYCLE ────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        Configured = await Api.IsAiConfiguredAsync();
+        if (Configured == true)
+            Models = (await Api.GetAiModelsAsync())?.ToList() ?? new();
+    }
+
+    // ── FILES ────────────────────────────────────────────────────
+    async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        FileError = null;
+
+        foreach (var file in e.GetMultipleFiles(4))
+        {
+            if (Images.Count >= 4) { FileError = "Four photos is the limit per request."; break; }
+
+            if (file.Size > MaxFileBytes)
+            {
+                FileError = $"{file.Name} is over 4 MB — resize it and try again.";
+                continue;
+            }
+
+            try
+            {
+                using var stream = file.OpenReadStream(MaxFileBytes);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+
+                var b64  = Convert.ToBase64String(ms.ToArray());
+                var mime = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
+
+                Images.Add(new PickedImage(file.Name, mime, b64, $"data:{mime};base64,{b64}"));
+            }
+            catch (Exception ex)
+            {
+                FileError = $"Could not read {file.Name}: {ex.Message}";
+            }
+        }
+    }
+
+    // ── GENERATE ─────────────────────────────────────────────────
+    async Task Generate()
+    {
+        if (Images.Count == 0) { Error = "Add at least one photo."; return; }
+
+        Busy = true; Error = null; Result = null; CopyNote = "";
+
+        try
+        {
+            var req = new GenerateProductContentRequest(
+                Name:        Blank(Name),
+                Category:    Blank(Category),
+                Price:       Price,
+                Material:    Blank(Material),
+                Occasion:    Blank(Occasion),
+                Notes:       Blank(Notes),
+                Images:      Images.Select(i => new AiImageInput(i.MimeType, i.Base64)).ToList(),
+                Model:       Blank(SelectedModel),
+                Temperature: Temperature);
+
+            var resp = await Api.GenerateProductContentAsync(req);
+
+            if (resp is null)
+                Error = "No response from the server. Is it running?";
+            else if (!resp.Success || resp.Data is null)
+                Error = resp.Message ?? "The request failed.";
+            else
+                Result = resp.Data;
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+
+        static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+
+    // ── COPY ─────────────────────────────────────────────────────
+    void Noted(string note) => CopyNote = note;
+
+    async Task CopyAll()
+    {
+        if (Result is null) return;
+
+        var md = $"""
+            # {(string.IsNullOrWhiteSpace(Name) ? Result.ProductTitle : Name)}
+
+            **Title:** {Result.ProductTitle}
+            **Meta:** {Result.SeoMetaDescription}
+            **Material:** {Result.Material}
+            **Alt text:** {Result.AltText}
+
+            ## Short
+            {Result.ShortDescription}
+
+            ## Long
+            {LongWithBullets}
+
+            ## Care
+            {Result.CareInstructions}
+
+            ## Instagram captions
+            {string.Join("\n\n", Result.InstagramCaptions.Select(c => $"### {c.Style}\n{c.Text}"))}
+
+            ## Hashtags
+            {HashtagLine}
+
+            ## Reel
+            {ReelText}
+
+            ## WhatsApp
+            {Result.WhatsAppBroadcast}
+
+            ## Story poll
+            {Result.StoryPollIdea}
+            """;
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", md);
+            CopyNote = "Copied: everything";
+        }
+        catch
+        {
+            CopyNote = "The browser blocked the clipboard — select the text and copy manually.";
+        }
+    }
+}

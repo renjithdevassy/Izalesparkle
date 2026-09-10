@@ -50,6 +50,9 @@ else
             <a href="/admin/categories" class="admin-nav-item @ActiveClass("/admin/categories")"    @onclick="CloseMobileMenu">
                 <span class="anav-icon">🗂️</span> Categories
             </a>
+            <a href="/admin/ai-content" class="admin-nav-item @ActiveClass("/admin/ai-content")"    @onclick="CloseMobileMenu">
+                <span class="anav-icon">✨</span> AI Copywriter
+            </a>
             <a href="/admin/users"      class="admin-nav-item @ActiveClass("/admin/users")"         @onclick="CloseMobileMenu">
                 <span class="anav-icon">👥</span> Users
             </a>
@@ -96,6 +99,7 @@ else
         var u when u.Contains("/admin/orders/edit")   => "Order Detail",
         var u when u.Contains("/admin/orders")        => "Orders",
         var u when u.Contains("/admin/categories")    => "Categories",
+        var u when u.Contains("/admin/ai-content")    => "AI Copywriter",
         var u when u.Contains("/admin/stock")         => "Stock Control",
         var u when u.Contains("/admin/discounts")     => "Discount Codes",
         var u when u.Contains("/admin/users")         => "Users",

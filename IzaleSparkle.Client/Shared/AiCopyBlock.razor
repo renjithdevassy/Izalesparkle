@@ -1,0 +1,42 @@
+@inject IJSRuntime JS
+
+@* One card of generated copy with a Copy button. Used by the AI Copywriter page. *@
+<div class="admin-form-card" style="margin-bottom:.9rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.5rem">
+        <div class="admin-form-section-title" style="margin:0">@Title</div>
+        @if (Copyable)
+        {
+            <button type="button" class="btn btn-outline"
+                    style="font-size:.62rem;padding:.25rem .6rem" @onclick="Copy">
+                @(JustCopied ? "Copied ✓" : "Copy")
+            </button>
+        }
+    </div>
+    <div style="white-space:pre-wrap;font-size:.82rem;line-height:1.6">@Body</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Body { get; set; } = "";
+    [Parameter] public bool Copyable { get; set; } = true;
+    /// <summary>Raised with a short status message after a copy attempt.</summary>
+    [Parameter] public EventCallback<string> OnCopied { get; set; }
+
+    bool JustCopied;
+
+    async Task Copy()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Body);
+            JustCopied = true;
+            await OnCopied.InvokeAsync($"Copied: {Title}");
+            await Task.Delay(1200);
+            JustCopied = false;
+        }
+        catch
+        {
+            await OnCopied.InvokeAsync("The browser blocked the clipboard — select the text and copy manually.");
+        }
+    }
+}

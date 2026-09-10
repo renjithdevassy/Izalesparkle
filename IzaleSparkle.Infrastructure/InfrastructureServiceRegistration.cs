@@ -8,6 +8,7 @@ using IzaleSparkle.Domain.Entities;
 using IzaleSparkle.Infrastructure.Persistence;
 using IzaleSparkle.Infrastructure.Repositories;
 using IzaleSparkle.Infrastructure.Notifications;
+using IzaleSparkle.Infrastructure.Ai;
 
 namespace IzaleSparkle.Infrastructure;
 
@@ -33,6 +34,11 @@ public static class InfrastructureServiceRegistration
 
         // WhatsApp/Meta catalog import — reads products via the Graph API (free reads).
         services.AddHttpClient<IWhatsAppCatalogService, MetaWhatsAppCatalogService>();
+
+        // AI copywriting — Google Gemini free tier (no card, per-minute/day caps).
+        // Needs Gemini:ApiKey; results are cached so repeat requests cost nothing.
+        services.AddHttpClient<IAiContentService, GeminiContentService>(c =>
+            c.Timeout = TimeSpan.FromSeconds(120));
 
         return services;
     }

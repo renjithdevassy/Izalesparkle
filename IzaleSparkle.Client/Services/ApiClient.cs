@@ -71,6 +71,10 @@ public interface IApiClient
     Task<ApiResponse<AdminOrderResponse>?> CancelOrderAdminAsync(int orderId, string reason, CancellationToken ct = default);
     Task<bool> CancelOrderCustomerAsync(string orderNumber, string reason, CancellationToken ct = default);
     Task<byte[]?> DownloadInvoiceAsync(int orderId, CancellationToken ct = default);
+    // Admin — AI copywriting
+    Task<ApiResponse<GeneratedProductContent>?> GenerateProductContentAsync(GenerateProductContentRequest req, CancellationToken ct = default);
+    Task<IEnumerable<AiModelInfo>?> GetAiModelsAsync(CancellationToken ct = default);
+    Task<bool> IsAiConfiguredAsync(CancellationToken ct = default);
 }
 
 public class ApiClient(HttpClient http, AuthService auth) : IApiClient
@@ -521,5 +525,34 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
 
         if (errors.Any()) message = string.Join(" ", errors);
         return ApiResponse<T>.Fail(message, errors);
+    }
+
+    // ── ADMIN: AI COPYWRITING ────────────────────────────────────
+    // Backed by the Gemini free tier. A 400 here is normal and readable
+    // (no key, rate limit hit, unknown model) — surface Message to the admin.
+    public async Task<ApiResponse<GeneratedProductContent>?> GenerateProductContentAsync(
+        GenerateProductContentRequest req, CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var resp = await http.PostAsJsonAsync("api/admin/ai/product-content", req, ct);
+        return await resp.Content.ReadFromJsonAsync<ApiResponse<GeneratedProductContent>>(cancellationToken: ct);
+    }
+
+    public async Task<IEnumerable<AiModelInfo>?> GetAiModelsAsync(CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var resp = await http.GetAsync("api/admin/ai/models", ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        var body = await resp.Content.ReadFromJsonAsync<ApiResponse<IEnumerable<AiModelInfo>>>(cancellationToken: ct);
+        return body?.Data;
+    }
+
+    public async Task<bool> IsAiConfiguredAsync(CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var resp = await http.GetAsync("api/admin/ai/status", ct);
+        if (!resp.IsSuccessStatusCode) return false;
+        var body = await resp.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken: ct);
+        return body?.Data ?? false;
     }
 }
