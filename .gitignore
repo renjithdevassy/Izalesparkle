@@ -27,3 +27,6 @@ IzaleSparkle.Server/wwwroot/uploads/
 # Use: dotnet user-secrets set "ConnectionStrings:Default" "..."
 appsettings.*.Local.json
 appsettings.Local.json
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json

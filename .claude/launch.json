@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "izale-server",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "IzaleSparkle.Server", "--launch-profile", "http"],
+      "port": 5000
+    }
+  ]
+}
