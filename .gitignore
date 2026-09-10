@@ -22,3 +22,8 @@ IzaleSparkle.Server/wwwroot/uploads/
 *.db
 *.db-shm
 *.db-wal
+
+# Local machine config — never commit real credentials.
+# Use: dotnet user-secrets set "ConnectionStrings:Default" "..."
+appsettings.*.Local.json
+appsettings.Local.json
