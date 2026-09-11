@@ -9,6 +9,7 @@ using IzaleSparkle.Infrastructure.Persistence;
 using IzaleSparkle.Infrastructure.Repositories;
 using IzaleSparkle.Infrastructure.Notifications;
 using IzaleSparkle.Infrastructure.Ai;
+using IzaleSparkle.Infrastructure.Social;
 
 namespace IzaleSparkle.Infrastructure;
 
@@ -39,6 +40,12 @@ public static class InfrastructureServiceRegistration
         // Needs Gemini:ApiKey; results are cached so repeat requests cost nothing.
         services.AddHttpClient<IAiContentService, GeminiContentService>(c =>
             c.Timeout = TimeSpan.FromSeconds(120));
+
+        // Instagram posting — Meta Graph API content publishing (free).
+        // Needs Instagram:IgUserId and Instagram:AccessToken. The timeout covers
+        // the container-status polling loop inside a single publish call.
+        services.AddHttpClient<IInstagramPublisher, InstagramPublisher>(c =>
+            c.Timeout = TimeSpan.FromSeconds(60));
 
         return services;
     }
