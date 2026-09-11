@@ -72,3 +72,84 @@ The model is told to describe only what the photo shows or the brief states: no
 invented gemstones, carats, hallmarks, weights, dimensions, certifications or prices,
 British spelling, and plated brass described as plated brass. Copy is still a draft —
 read it before it goes live.
+
+---
+
+# Posting to Instagram
+
+The generated captions can go straight to Instagram from the results panel —
+**📷 Post this to Instagram** under each caption posts that caption plus all the
+hashtags as a single photo post. Meta charges nothing for content publishing.
+
+Only feed photo posts are automated. Reels need a video file, Story poll stickers
+cannot be created through the API, and WhatsApp broadcasts are billed per
+conversation — those three stay copy-and-paste.
+
+## Setup (once, free)
+
+1. An **Instagram Business or Creator** account, linked to a Facebook Page
+   (Instagram app → Settings → Account type and tools).
+2. A Meta app at [developers.facebook.com](https://developers.facebook.com) with
+   the **Instagram Graph API** product added. Posting to your own account works in
+   development mode — no app review needed.
+3. Generate a **long-lived access token** with `instagram_basic`,
+   `instagram_content_publish` and `pages_read_engagement`, and find your
+   Instagram Business account id (Graph API Explorer → `me/accounts` →
+   `{page-id}?fields=instagram_business_account`).
+4. Store both outside source control:
+
+   ```
+   cd IzaleSparkle.Server
+   dotnet user-secrets set "Instagram:IgUserId"    "17841400000000000"
+   dotnet user-secrets set "Instagram:AccessToken" "EAAG..."
+   ```
+
+   On the host set them as app settings instead (`Instagram__IgUserId`,
+   `Instagram__AccessToken`). `appsettings.json` ships placeholders on purpose.
+
+## Configuration
+
+| Key                        | Default   | Notes |
+|----------------------------|-----------|-------|
+| `Instagram:IgUserId`       | *(empty)* | Instagram Business account id, not the @username. |
+| `Instagram:AccessToken`    | *(empty)* | Long-lived token. **Expires roughly every 60 days — refresh it or posting stops.** |
+| `Instagram:GraphVersion`   | `v21.0`   | Graph API version. |
+| `Site:BaseUrl`             | `https://izalesparkle.com` | Used to build the public image URL Meta fetches. |
+
+The button only appears when both values are set; `GET /api/admin/social/status`
+reports that, and the connected @username, to the admin page.
+
+## How a post is made
+
+Instagram never receives the image bytes — it fetches the photo over the public
+internet. So posting runs:
+
+1. The selected photo is uploaded to `/uploads/...` on this site (cached, so
+   posting a second caption with the same photo does not re-upload it).
+2. `POST {ig-user-id}/media` creates a container from that absolute URL + caption.
+3. The container status is polled until `FINISHED` (photos take a few seconds).
+4. `POST {ig-user-id}/media_publish` publishes it, and the permalink comes back
+   to the admin page.
+
+**Posting only works from the deployed site.** From `localhost` Meta cannot reach
+the image, so the endpoint rejects the attempt with that explanation rather than a
+vague Graph API error.
+
+## Limits worth knowing
+
+* Caption max 2200 characters, max 30 hashtags — both checked before the call,
+  so an over-long caption fails instantly rather than after an upload.
+* JPEG works most reliably; aspect ratio must be between 4:5 and 1.91:1.
+* Instagram caps published posts per rolling 24 hours (dozens, not hundreds).
+* Publishing is irreversible from here — the page asks for confirmation first,
+  and deleting a post is done in the Instagram app.
+
+## Files
+
+```
+IzaleSparkle.Application/Common/Interfaces/IInstagramPublisher.cs
+IzaleSparkle.Application/Social/Commands/PublishInstagramCommand.cs
+IzaleSparkle.Infrastructure/Social/InstagramPublisher.cs    the only Graph-aware file
+IzaleSparkle.Server/Controllers/SocialController.cs
+IzaleSparkle.Client/Pages/Admin/AiContent.razor             the Post buttons
+```

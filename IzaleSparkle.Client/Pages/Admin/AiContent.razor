@@ -50,7 +50,7 @@ else
                                 <img src="@current.DataUrl" alt="" style="width:100%;height:100%;object-fit:cover" />
                                 <button type="button" title="Remove"
                                         style="position:absolute;top:2px;right:2px;border:0;border-radius:5px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:0 .3rem;cursor:pointer"
-                                        @onclick="() => Images.Remove(current)">✕</button>
+                                        @onclick="() => RemoveImage(current)">✕</button>
                             </div>
                         }
                     </div>
@@ -157,9 +157,53 @@ else
                 <AiCopyBlock Title="Long description" Body="@LongWithBullets" OnCopied="Noted" />
                 <AiCopyBlock Title="Material line" Body="@Result.Material" OnCopied="Noted" />
 
+                @if (Instagram?.InstagramConfigured == true && Images.Count > 1)
+                {
+                    <div class="admin-form-card" style="margin-bottom:.9rem">
+                        <div class="admin-form-section-title">Photo to post</div>
+                        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                            @for (var i = 0; i < Images.Count; i++)
+                            {
+                                var index = i;
+                                <button type="button" @onclick="() => PostPhotoIndex = index"
+                                        style="@ThumbStyle(index)">
+                                    <img src="@Images[index].DataUrl" alt="" style="width:100%;height:100%;object-fit:cover" />
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+
                 @foreach (var cap in Result.InstagramCaptions)
                 {
-                    <AiCopyBlock Title="@($"Instagram caption — {cap.Style}")" Body="@cap.Text" OnCopied="Noted" />
+                    var caption = cap;
+                    <AiCopyBlock Title="@($"Instagram caption — {caption.Style}")" Body="@caption.Text" OnCopied="Noted" />
+
+                    @if (Instagram?.InstagramConfigured == true)
+                    {
+                        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin:-.4rem 0 .9rem .2rem">
+                            <button class="btn btn-outline" style="font-size:.68rem"
+                                    disabled="@(Posting is not null)"
+                                    @onclick="() => PostToInstagram(caption)">
+                                @(Posting == caption.Style ? "Posting…" : "📷 Post this to Instagram")
+                            </button>
+                            <span class="admin-field-hint">
+                                with all @Result.Hashtags.Count hashtags@(Instagram.AccountName is null ? "" : $" · @{Instagram.AccountName}")
+                            </span>
+                        </div>
+                    }
+                }
+
+                @if (!string.IsNullOrEmpty(PostError))
+                {
+                    <div class="admin-error-banner" style="margin-bottom:.9rem">⚠️ @PostError</div>
+                }
+                @if (PostedLink is not null)
+                {
+                    <div class="admin-form-card" style="margin-bottom:.9rem;font-size:.8rem">
+                        ✅ Posted to Instagram.
+                        <a href="@PostedLink" target="_blank" rel="noreferrer">View the post →</a>
+                    </div>
                 }
 
                 <AiCopyBlock Title="@($"Hashtags ({Result.Hashtags.Count})")" Body="@HashtagLine" OnCopied="Noted" />
@@ -194,6 +238,18 @@ else
 
     GeneratedProductContent? Result;
 
+    // ── INSTAGRAM POSTING ────────────────────────────────────────
+    SocialStatus? Instagram;
+    string? Posting;      // caption style currently being posted, null when idle
+    string? PostError;
+    string? PostedLink;
+    int PostPhotoIndex;
+
+    // Uploaded URL per photo index — Meta fetches the image itself, so the photo
+    // has to exist on the public site before posting. Cached so posting a second
+    // caption with the same photo does not upload it twice.
+    readonly Dictionary<int, string> UploadedUrls = new();
+
     static readonly string[] Categories =
     {
         "necklaces", "chokers", "earrings", "jhumkas", "bangles", "bracelets",
@@ -218,13 +274,83 @@ else
     {
         Configured = await Api.IsAiConfiguredAsync();
         if (Configured == true)
-            Models = (await Api.GetAiModelsAsync())?.ToList() ?? new();
+        {
+            Models    = (await Api.GetAiModelsAsync())?.ToList() ?? new();
+            Instagram = await Api.GetSocialStatusAsync();
+        }
+    }
+
+    // ── INSTAGRAM ────────────────────────────────────────────────
+    string ThumbStyle(int index) =>
+        "width:66px;height:66px;border-radius:8px;overflow:hidden;padding:0;cursor:pointer;background:none;" +
+        (index == PostPhotoIndex ? "border:2px solid #b08d57" : "border:1px solid #e7ddd2;opacity:.6");
+
+    async Task PostToInstagram(AiCaption caption)
+    {
+        if (Result is null || Images.Count == 0) return;
+
+        var text = $"{caption.Text}\n\n{HashtagLine}";
+
+        // Posting is public and cannot be undone from here — make the admin mean it.
+        var ok = await JS.InvokeAsync<bool>("confirm",
+            $"Post this to Instagram now?\n\n{text[..Math.Min(text.Length, 180)]}…");
+        if (!ok) return;
+
+        Posting = caption.Style; PostError = null; PostedLink = null;
+
+        try
+        {
+            var imageUrl = await EnsureUploadedAsync(PostPhotoIndex);
+            if (imageUrl is null)
+            {
+                PostError = "Could not upload the photo to the site, so Instagram has nothing to fetch.";
+                return;
+            }
+
+            var resp = await Api.PublishToInstagramAsync(new PublishInstagramRequest(imageUrl, text));
+
+            if (resp is null)
+                PostError = "No response from the server.";
+            else if (!resp.Success || resp.Data is null)
+                PostError = resp.Message ?? "The post failed.";
+            else
+                PostedLink = resp.Data.Permalink ?? "https://www.instagram.com/";
+        }
+        catch (Exception ex)
+        {
+            PostError = ex.Message;
+        }
+        finally
+        {
+            Posting = null;
+        }
+    }
+
+    /// <summary>Uploads the chosen photo to /uploads once and returns its public path.</summary>
+    async Task<string?> EnsureUploadedAsync(int index)
+    {
+        if (UploadedUrls.TryGetValue(index, out var cached)) return cached;
+
+        var img   = Images[index];
+        var bytes = Convert.FromBase64String(img.Base64);
+
+        using var ms = new MemoryStream(bytes);
+        var uploaded = await Api.UploadImageAsync(ms, img.Name, img.MimeType);
+
+        if (uploaded is null) return null;
+
+        UploadedUrls[index] = uploaded.Url;
+        return uploaded.Url;
     }
 
     // ── FILES ────────────────────────────────────────────────────
     async Task OnFilesSelected(InputFileChangeEventArgs e)
     {
         FileError = null;
+
+        // Indexes shift as photos are added or removed — drop the upload cache.
+        UploadedUrls.Clear();
+        PostPhotoIndex = 0;
 
         foreach (var file in e.GetMultipleFiles(4))
         {
@@ -254,12 +380,20 @@ else
         }
     }
 
+    void RemoveImage(PickedImage img)
+    {
+        Images.Remove(img);
+        UploadedUrls.Clear();      // remaining photos have shifted index
+        PostPhotoIndex = 0;
+    }
+
     // ── GENERATE ─────────────────────────────────────────────────
     async Task Generate()
     {
         if (Images.Count == 0) { Error = "Add at least one photo."; return; }
 
         Busy = true; Error = null; Result = null; CopyNote = "";
+        PostError = null; PostedLink = null;
 
         try
         {

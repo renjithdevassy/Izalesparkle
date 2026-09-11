@@ -75,6 +75,11 @@ public interface IApiClient
     Task<ApiResponse<GeneratedProductContent>?> GenerateProductContentAsync(GenerateProductContentRequest req, CancellationToken ct = default);
     Task<IEnumerable<AiModelInfo>?> GetAiModelsAsync(CancellationToken ct = default);
     Task<bool> IsAiConfiguredAsync(CancellationToken ct = default);
+
+    // Social publishing
+    Task<SocialStatus?> GetSocialStatusAsync(CancellationToken ct = default);
+    Task<ApiResponse<InstagramPublishResult>?> PublishToInstagramAsync(
+        PublishInstagramRequest req, CancellationToken ct = default);
 }
 
 public class ApiClient(HttpClient http, AuthService auth) : IApiClient
@@ -554,5 +559,25 @@ public class ApiClient(HttpClient http, AuthService auth) : IApiClient
         if (!resp.IsSuccessStatusCode) return false;
         var body = await resp.Content.ReadFromJsonAsync<ApiResponse<bool>>(cancellationToken: ct);
         return body?.Data ?? false;
+    }
+
+    // ── ADMIN: SOCIAL PUBLISHING ─────────────────────────────────
+    // A 400 here is normal and readable (no token, expired token, image Meta
+    // rejected) — surface Message to the admin rather than treating it as a bug.
+    public async Task<SocialStatus?> GetSocialStatusAsync(CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var resp = await http.GetAsync("api/admin/social/status", ct);
+        if (!resp.IsSuccessStatusCode) return null;
+        var body = await resp.Content.ReadFromJsonAsync<ApiResponse<SocialStatus>>(cancellationToken: ct);
+        return body?.Data;
+    }
+
+    public async Task<ApiResponse<InstagramPublishResult>?> PublishToInstagramAsync(
+        PublishInstagramRequest req, CancellationToken ct = default)
+    {
+        SetAuthHeader();
+        var resp = await http.PostAsJsonAsync("api/admin/social/instagram", req, ct);
+        return await resp.Content.ReadFromJsonAsync<ApiResponse<InstagramPublishResult>>(cancellationToken: ct);
     }
 }
